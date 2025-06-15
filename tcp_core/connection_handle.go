@@ -3,6 +3,7 @@ package tcp_core
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -42,11 +43,36 @@ func handle_connection(conn net.Conn) {
 	// operation code 0 first chunk, 1 upload chunk, 2 close connection upload complete, 3 close connection upload not complete
 	// from the header get the uploadID
 	// chunkNO,
+	var header_body struct {
+		UploadID      string `json:"upload_id"`
+		OperationCode uint8  `json:"operation_code"`
+		ChunkNo       int    `json:"chunk_no"`
+		ChunkSize     int    `json:"chunk_size"`
+	}
 	for {
 		header_buffer, err := read_header(bReader, global_configs.HEADERlENGTH)
 
 		if err != nil {
 			// let the user
+		}
+
+		// decode the buffer into an map object
+		err = json.Unmarshal(header_buffer, &header_body)
+
+		if err != nil {
+			// request error need to let the sender know
+		}
+
+		switch header_body.OperationCode {
+		case global_configs.FIRSTCHUNKOPCODE:
+			// check if the uploadID is in the database
+			// if it is in the database, add the uploadID in the main memory safe map
+		case global_configs.UPLOADCHUNKOPCODE:
+			// we add it to the channel
+		case global_configs.UPLOADFINISHOPCODE:
+			// check if all the chunks were uploaded or not
+		case global_configs.UPLOADCANCELOPCODE:
+			// need to do clean up
 		}
 
 	}
@@ -61,7 +87,7 @@ func read_header(bReader *bufio.Reader, header_len int) ([]byte, error) {
 	// checking for errors
 	if n < header_len {
 		// return error not all bytes were read
-		return nil, errors.New("Not all header len bytes were read")
+		return nil, errors.New("not all header len bytes were read")
 	}
 	// checking for errors
 	if err != nil {
@@ -77,7 +103,7 @@ func read_header(bReader *bufio.Reader, header_len int) ([]byte, error) {
 
 	if n < header_len {
 		// return error that not all bytes were returned
-		return nil, errors.New("Not all header bytes were read")
+		return nil, errors.New("not all header bytes were read")
 	}
 	if err != nil {
 		return nil, err
@@ -87,4 +113,4 @@ func read_header(bReader *bufio.Reader, header_len int) ([]byte, error) {
 
 }
 
-func read_request(bReader *bufio.Reader)
+// func read_request(bReader *bufio.Reader) {}
