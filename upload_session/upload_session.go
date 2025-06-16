@@ -11,5 +11,7 @@ type UploadSessionState struct {
 	ChunksUploaded                int
 	ChunksUploadedSinceLastUpdate int
 	ChunkSize                     int
+	ParentPath                    string
+	FileName                      string
 	LastActivity                  time.Time
 }
