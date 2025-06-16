@@ -1,7 +1,8 @@
 package global_configs
 
 const HEADERlENGTH = 4
-const FIRSTCHUNKOPCODE = 0
+
+// const FIRSTCHUNKOPCODE = 0
 const UPLOADCHUNKOPCODE = 1
 const UPLOADFINISHOPCODE = 2
 const UPLOADCANCELOPCODE = 3

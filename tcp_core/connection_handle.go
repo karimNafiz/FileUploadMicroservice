@@ -9,11 +9,14 @@ import (
 	"io"
 	"net"
 
+	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	"github.com/file_upload_microservice/global_configs"
+	"github.com/file_upload_microservice/safemap"
+	"github.com/file_upload_microservice/upload_session"
 )
 
 // need a function for listening to tcp connections
-func StartTCPListener(port string) {
+func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSessionState]) {
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		panic(err)
@@ -29,12 +32,12 @@ func StartTCPListener(port string) {
 		}
 
 		// Handle the connection in a separate goroutine
-		go handle_connection(conn)
+		go handle_connection(conn, safemap)
 	}
 
 }
 
-func handle_connection(conn net.Conn) {
+func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.UploadSessionState]) {
 	// create a buffered reader out of the connection
 	defer conn.Close()
 	bReader := bufio.NewReader(conn)
@@ -63,10 +66,23 @@ func handle_connection(conn net.Conn) {
 			// request error need to let the sender know
 		}
 
+		upload_session_state, flag := safemap.Get(header_body.UploadID)
+		if !flag {
+			// huge fucking issue
+			// do something
+		}
 		switch header_body.OperationCode {
 
 		case global_configs.UPLOADCHUNKOPCODE:
-			// we add it to the channel
+
+			chunk_buffer, err := read_chunk(bReader, header_body.ChunkSize)
+			if err != nil {
+				// issues with reading chunks
+				// need to send the sender a message
+			}
+			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), upload_session_state.ParentPath, chunk_buffer)
+			// need to add this chunk job to the thread pool
+			p_chunk_job.AddChunkJob(chunk_job)
 		case global_configs.UPLOADFINISHOPCODE:
 			// check if all the chunks were uploaded or not
 		case global_configs.UPLOADCANCELOPCODE:
