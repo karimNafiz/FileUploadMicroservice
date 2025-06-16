@@ -111,4 +111,18 @@ func read_header(bReader *bufio.Reader, header_len int) ([]byte, error) {
 
 }
 
-// func read_request(bReader *bufio.Reader) {}
+func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
+	chunk_buffer := make([]byte, chunk_size)
+	n, err := io.ReadFull(bReader, chunk_buffer[:])
+
+	if n < chunk_size {
+		return nil, errors.New(" not all of the chunk is sent ")
+	}
+	if err != nil {
+
+		return nil, errors.New("reading chunk error")
+	}
+
+	return chunk_buffer, nil
+
+}
