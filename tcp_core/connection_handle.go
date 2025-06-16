@@ -65,8 +65,11 @@ func handle_connection(conn net.Conn) {
 
 		switch header_body.OperationCode {
 		case global_configs.FIRSTCHUNKOPCODE:
-			// check if the uploadID is in the database
+			// first check if the upload ID is in the database// if it is in the databse then that means that the main service did tell us about it
+			// if it doesnt exist in the database, potential security risk
+
 			// if it is in the database, add the uploadID in the main memory safe map
+			// we need to read the header create the UploadSessionState struct and store it in the safe map
 		case global_configs.UPLOADCHUNKOPCODE:
 			// we add it to the channel
 		case global_configs.UPLOADFINISHOPCODE:
