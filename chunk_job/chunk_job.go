@@ -9,6 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	p_safemap "github.com/file_upload_microservice/safemap"
+	p_upload_session_state "github.com/file_upload_microservice/upload_session_state"
 	// logger "docTrack/logger"
 )
 
@@ -110,7 +113,7 @@ func StartWorkerPool(ctx context.Context, poolSize uint) error {
 					return
 				case job := <-bufferedChunkJobChannelInstance.jobs:
 					// Received a chunk job → attempt to write
-					writeChunkAt(job, bufferedChunkJobChannelInstance.jobErrors)
+					writeChunkAt(job, bufferedChunkJobChannelInstance.jobErrors, bufferedChunkJobChannelInstance.jobConfirmation)
 				}
 			}
 		}(i)
@@ -119,7 +122,7 @@ func StartWorkerPool(ctx context.Context, poolSize uint) error {
 	return nil
 }
 
-func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint) error {
+func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint, safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSessionState]) error {
 	if bufferedChunkJobChannelInstance == nil {
 		return fmt.Errorf("chunk job confirmation channel not initialized;  call InstantiateBufferedChunkJobChannel first ")
 	}
@@ -132,7 +135,7 @@ func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint) err
 					// if the context is closed we just return and the go routine is stopped
 					return
 				case confirmedJob := <-bufferedChunkJobChannelInstance.jobConfirmation:
-					handleConfirmedJob(confirmedJob)
+					handleConfirmedJob(confirmedJob, safemap)
 				}
 
 			}
@@ -192,7 +195,7 @@ func AddChunkJob(job *chunkJob) error {
 
 // writeChunkAt attempts to write the chunk to disk. On error, it sends the job
 // into the provided errChannel for separate handling.
-func writeChunkAt(job *chunkJob, errChannel chan<- *chunkJob) {
+func writeChunkAt(job *chunkJob, errChannel chan<- *chunkJob, confirmedChannel chan<- *chunkJob) {
 	// so the filePath would be tempUploadDir/uploadID(chunkJob)/chunkJob.String() whatever string returns
 	filePath := filepath.Join(job.parentPath, job.String())
 
@@ -221,9 +224,11 @@ func writeChunkAt(job *chunkJob, errChannel chan<- *chunkJob) {
 		errChannel <- job
 		return
 	}
-
 	// Success: log the successful write.
-	//logger.InfoLogger.Printf("[%s] successfully written", job.String())
+	// if the write is successful
+	// then we will push this to the jobConfirmedPool
+	confirmedChannel <- job
+
 }
 
 // -----------------------------------------------------------------------------
@@ -240,7 +245,15 @@ func handleFailedJob(job *chunkJob) {
 
 }
 
-func handleConfirmedJob(job *chunkJob) {
+func handleConfirmedJob(job *chunkJob, safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSesionState]) {
+	// notify the safemap chunk job complete
+	val, exists := safemap.Get(job.uploadID)
+	if !exists {
+		// dont really know what to do
+		// maybe we jus log
+		return
+	}
+	val.NotifyConfirmation()
 
 }
 
