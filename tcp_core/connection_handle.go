@@ -73,6 +73,8 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			// do something
 		}
 		switch header_body.OperationCode {
+		case global_configs.FIRSTCHUNKOPCODE:
+			// add this connection to the UploadSessionStruct stored in the safe map
 
 		case global_configs.UPLOADCHUNKOPCODE:
 

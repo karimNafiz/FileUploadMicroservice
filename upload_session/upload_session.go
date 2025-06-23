@@ -7,6 +7,7 @@ import (
 
 type UploadSessionState struct {
 	Conn                          net.Conn
+	UploadID                      string
 	TotalChunks                   int
 	ChunksUploaded                int
 	ChunksUploadedSinceLastUpdate int
@@ -26,4 +27,15 @@ func (u *UploadSessionState) NotifyConfirmation() {
 	// keeping this function very simple right now
 	u.ChunksUploaded++
 	u.ChunksUploadedSinceLastUpdate++
+}
+func NewUploadSessionState(conn net.Conn, uploadID string, totalChunks int, chunkSize int, parentPath, fileName string) *UploadSessionState {
+	return &UploadSessionState{
+		Conn:         conn,
+		UploadID:     uploadID,
+		TotalChunks:  totalChunks,
+		ChunkSize:    chunkSize,
+		ParentPath:   parentPath,
+		FileName:     fileName,
+		LastActivity: time.Now(),
+	}
 }

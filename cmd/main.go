@@ -83,6 +83,11 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_st
 			return
 		}
 
+		// if there are not errors in the request body need to create a NewUploadSessionState struct
+		// I am manually adding the UploadSessionState
+		// create a NewUploadSession
+		safemap.Add(reqBody.UploadID, p_upload_session_state.NewUploadSessionState(nil, reqBody.UploadID, reqBody.TotalChunks, reqBody.ChunkSize, reqBody.FinalPath, reqBody.Filename))
+
 	})
 }
 
