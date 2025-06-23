@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+
+	"net/http"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	p_safemap "github.com/file_upload_microservice/safemap"
 	p_tcp_core "github.com/file_upload_microservice/tcp_core"
 	p_upload_session_state "github.com/file_upload_microservice/upload_session"
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -49,3 +53,55 @@ func main() {
 	p_tcp_core.StartTCPListener(":9000", safemap)
 
 }
+
+func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSessionState]) *mux.Router {
+	router := mux.NewRouter()
+	router.Handle("/upload/init", getInitUploadSessionHandler(safemap)).Methods("POST")
+	return router
+}
+
+func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSessionState]) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// need to make sure the connection is closed
+		defer r.Body.Close()
+		// struct to represent the request
+		// to send a request a the API, they need to follow this structure
+		var reqBody struct {
+			UploadID    string `json:"uploadID"`
+			Filename    string `json:"filename"`
+			FinalPath   string `json:"final_path"`
+			ChunkSize   int    `json:"chunk_size"`
+			TotalChunks int    `json:"total_chunks"`
+		}
+		// decoding the body
+		err := json.NewDecoder(r.Body).Decode(&reqBody)
+
+		// if there were errors whilst decoding, then the request is bad
+		if err != nil {
+			http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+			return
+		}
+
+	})
+}
+
+// func initUploadSession(w http.ResponseWriter, r *http.Request){
+// 	// need to make sure the connection is closed
+// 	defer r.Body.Close()
+// 	var reqBody struct{
+// 		UploadID string `json:"uploadID"`
+// 		Filename string `json:"filename"`
+// 		FinalPath string `json:"final_path"`
+// 		ChunkSize int `json:"chunk_size"`
+// 		TotalChunks int `json:"total_chunks"`
+// 	}
+
+// 	err := json.NewDecoder(r.Body).Decode(&reqBody)
+
+// 	if err != nil{
+// 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+// 		return
+// 	}
+
+// }
