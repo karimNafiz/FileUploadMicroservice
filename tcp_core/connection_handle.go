@@ -69,6 +69,7 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 		upload_session_state, flag := safemap.Get(header_body.UploadID)
 		if !flag {
 			// huge fucking issue
+			// if the entry is not in the safe map, someone else un-authorized is trying to connect
 			// do something
 		}
 		switch header_body.OperationCode {
