@@ -18,12 +18,22 @@ func main() {
 
 	// now need to start the worker pool
 	// for that need to create a background context so that I can stop the context and all the derived go routines
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// now need to start creating the worker pool
-	p_chunk_job.StartWorkerPool(ctx, 4)
+	err := p_chunk_job.StartWorkerPool(ctx, 4)
+
+	// if there is an error cancel the context
+	if err != nil {
+		cancel()
+		return
+	}
 	// now need to start the error checking worker pool
-	p_chunk_job.StartErrorHandlerPool(ctx, 4)
+	err = p_chunk_job.StartErrorHandlerPool(ctx, 4)
+	if err != nil {
+		cancel()
+		return
+	}
 
 	// need to start the chunk_job_confirmation worker pool
 

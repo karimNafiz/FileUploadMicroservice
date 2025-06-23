@@ -62,8 +62,9 @@ func CreateChunkJob(uploadID string, chunkNO uint, baseDirectoryPath string, dat
 //
 // This allows separate pipelines for writes and error handling.
 type bufferedChunkJobChannelStruct struct {
-	jobs      chan *chunkJob // buffered channel carrying chunkJob instances
-	jobErrors chan *chunkJob // buffered channel carrying failed chunkJob instances
+	jobs            chan *chunkJob // buffered channel carrying chunkJob instances
+	jobErrors       chan *chunkJob // buffered channel carrying failed chunkJob instances
+	jobConfirmation chan *chunkJob
 }
 
 var (
@@ -116,6 +117,29 @@ func StartWorkerPool(ctx context.Context, poolSize uint) error {
 	}
 
 	return nil
+}
+
+func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint) error {
+	if bufferedChunkJobChannelInstance == nil {
+		return fmt.Errorf("chunk job confirmation channel not initialized;  call InstantiateBufferedChunkJobChannel first ")
+	}
+
+	for i := uint(0); i < handlerCount; i++ {
+		go func(handlerID uint) {
+			for {
+				select {
+				case <-ctx.Done():
+					// if the context is closed we just return and the go routine is stopped
+					return
+				case confirmedJob := <-bufferedChunkJobChannelInstance.jobConfirmation:
+					handleConfirmedJob(confirmedJob)
+				}
+
+			}
+		}(i)
+	}
+	return nil
+
 }
 
 // StartErrorHandlerPool launches 'handlerCount' goroutines that read from the
@@ -213,6 +237,11 @@ func writeChunkAt(job *chunkJob, errChannel chan<- *chunkJob) {
 func handleFailedJob(job *chunkJob) {
 	// TODO: implement retry policies, metrics, or DB updates
 	//logger.ErrorLogger.Printf("handling failed job: %s", job.String())
+
+}
+
+func handleConfirmedJob(job *chunkJob) {
+
 }
 
 // need the function create chunk job
