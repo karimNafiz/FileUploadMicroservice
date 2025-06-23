@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	p_safemap "github.com/file_upload_microservice/safemap"
-	p_upload_session_state "github.com/file_upload_microservice/upload_session_state"
+	p_upload_session "github.com/file_upload_microservice/upload_session"
 	// logger "docTrack/logger"
 )
 
@@ -122,7 +122,7 @@ func StartWorkerPool(ctx context.Context, poolSize uint) error {
 	return nil
 }
 
-func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint, safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSessionState]) error {
+func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint, safemap *p_safemap.SafeMap[*p_upload_session.UploadSessionState]) error {
 	if bufferedChunkJobChannelInstance == nil {
 		return fmt.Errorf("chunk job confirmation channel not initialized;  call InstantiateBufferedChunkJobChannel first ")
 	}
@@ -245,7 +245,9 @@ func handleFailedJob(job *chunkJob) {
 
 }
 
-func handleConfirmedJob(job *chunkJob, safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSesionState]) {
+// might have to review this architecture
+// because currently handleConfirmedJob doesnt seem like it deserves it own channel
+func handleConfirmedJob(job *chunkJob, safemap *p_safemap.SafeMap[*p_upload_session.UploadSessionState]) {
 	// notify the safemap chunk job complete
 	val, exists := safemap.Get(job.uploadID)
 	if !exists {
