@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	p_safemap "github.com/file_upload_microservice/safemap"
 	p_tcp_core "github.com/file_upload_microservice/tcp_core"
 	p_upload_session_state "github.com/file_upload_microservice/upload_session"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -48,13 +50,28 @@ func main() {
 	safemap := p_safemap.NewSafeMap[*p_upload_session_state.UploadSessionState]()
 
 	// need to set up the main router
-	setUpRouter(safemap)
+	router := setUpRouter(safemap)
 
-	// now need to start the tcp connection
-	// currently start the tcp listener on port 9000
-	// currently hard coding it, need to change it later
-	// passing the safe map created
-	p_tcp_core.StartTCPListener(":9000", safemap)
+	// need to launch this service in a different go-routine or else
+	// no code will run below this code
+	go func() {
+		// now need to start the tcp connection
+		// currently start the tcp listener on port 9000
+		// currently hard coding it, need to change it later
+		// passing the safe map created
+		p_tcp_core.StartTCPListener(":9000", safemap)
+
+	}()
+
+	cors := handlers.CORS(
+		handlers.AllowedOrigins([]string{"http://localhost:3000"}), // your UI origin
+		handlers.AllowedMethods([]string{"GET", "POST", "DELETE", "OPTIONS"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "X-Chunk-Index"}),
+		handlers.AllowCredentials(),
+	)
+
+	log.Println(" Main Server running on :8000 ")
+	http.ListenAndServe(":8000", cors(router))
 
 }
 
