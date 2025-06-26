@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	// need to set up the main router
 
 	// instantiating the buffered chunk job channel
 	// currently hard coding it to four
@@ -45,6 +46,9 @@ func main() {
 	// the safe map will be of type pointer to UploadSesionState
 	// the UploadSessionState holds all the necessary information about the upload session
 	safemap := p_safemap.NewSafeMap[*p_upload_session_state.UploadSessionState]()
+
+	// need to set up the main router
+	setUpRouter(safemap)
 
 	// now need to start the tcp connection
 	// currently start the tcp listener on port 9000
