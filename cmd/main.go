@@ -107,7 +107,16 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_st
 		// if there are not errors in the request body need to create a NewUploadSessionState struct
 		// I am manually adding the UploadSessionState
 		// create a NewUploadSession
+		// TODO need to add some safety measures
 		safemap.Add(reqBody.UploadID, p_upload_session_state.NewUploadSessionState(nil, reqBody.UploadID, reqBody.TotalChunks, reqBody.ChunkSize, reqBody.FinalPath, reqBody.Filename))
+
+		// after adding it to the safe map need to send a message back to the client
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Upload Session Created",
+		})
 
 	})
 }
