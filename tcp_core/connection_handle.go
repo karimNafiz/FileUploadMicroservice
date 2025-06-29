@@ -76,11 +76,14 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 		}
 		switch header_body.OperationCode {
 		case global_configs.UPLOADINITOPCODE:
-			upload_session_state, exists := safemap.Get(header_body.UploadID)
+			upload_session, exists := safemap.Get(header_body.UploadID)
 			if !exists {
 				// if it doesnt exists think of a solution
 				// we have send back to the client to communicate first with the main service
 			}
+			// need to store the connection
+			// need to create the dedicated channels
+			// need a function
 
 		case global_configs.UPLOADCHUNKOPCODE:
 
