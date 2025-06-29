@@ -76,15 +76,10 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 		}
 		switch header_body.OperationCode {
 		case global_configs.UPLOADINITOPCODE:
-			upload_session, exists := safemap.Get(header_body.UploadID)
-			if !exists {
-				// if it doesnt exists think of a solution
-				// we have send back to the client to communicate first with the main service
+			if err := init_upload_session(header_body.UploadID, safemap, conn, global_configs.CHUNKJOBWORKERPOOL*2, 16, 16); err != nil {
+				// need to do something
+				// this error means the Upload Session Doesn't exist
 			}
-			// need to store the connection
-			// need to create the dedicated channels
-			// need a function
-
 		case global_configs.UPLOADCHUNKOPCODE:
 
 			chunk_buffer, err := read_chunk(bReader, header_body.ChunkSize)
@@ -153,4 +148,58 @@ func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
 
 	return chunk_buffer, nil
 
+}
+
+func init_upload_session(uploadID string, safemap *safemap.SafeMap[*upload_session.UploadSession], tcp_socket net.Conn, session_pool_size uint, session_error_pool_size uint, session_ack_pool_size uint) error {
+	// TODO consider creating a buffered Writer from the conn in here
+	// first read about bufferedWriter toh
+
+	upload_session, exists := safemap.Get(uploadID)
+	if !exists {
+		return errors.New("UploadSession does not exist")
+	}
+	// if no error
+	// then we have to add all the session data to the UploadSession
+
+	upload_session.Conn = tcp_socket
+	upload_session.In = make(chan *p_chunk_job.ChunkJob, session_pool_size)
+	upload_session.Err = make(chan *p_chunk_job.ChunkJobError, session_error_pool_size)
+	upload_session.Acks = make(chan *p_chunk_job.ChunkJobAck, session_ack_pool_size)
+
+	// this dispatcher go function
+	go func() {
+		// typical go for select loop
+		// need to add a timeout
+		// TODO: review the entire system
+		// to find out where exactly I need to add timeouts
+
+		// create an encoder
+		// the encoder will be re-used for our purpose
+		for {
+			select {
+			case chunk_job := <-upload_session.In:
+				p_chunk_job.AddChunkJob(chunk_job)
+			// maybe instead of hard coding this error I need to find a better solution
+			// maybe have encode functions for those structs?
+			case chunk_job_error := <-upload_session.Err:
+				bytes, err := chunk_job_error.MarshalJSON()
+				if err != nil {
+					// don't really what to do in this case
+				}
+				tcp_socket.Write(bytes)
+				// write back to the connection
+			case chunk_job_ack := <-upload_session.Acks:
+				bytes, err := chunk_job_ack.MarshalJSON()
+				if err != nil {
+					// don't know what to really do
+				}
+				tcp_socket.Write(bytes)
+			case <-upload_session.Done:
+				return
+			}
+
+		}
+	}()
+
+	return nil
 }

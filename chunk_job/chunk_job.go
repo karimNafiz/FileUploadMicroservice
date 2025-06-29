@@ -5,6 +5,7 @@ package chunk_job
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,12 +64,50 @@ type ChunkJobError struct {
 	Error    error
 }
 
+func (c *ChunkJobError) MarshalJSON() ([]byte, error) {
+	body := struct {
+		UploadID string `json:"uploadID"`
+		ChunkNo  uint   `json:"chunk_no"`
+		Error    string `json:"error"`
+	}{
+		UploadID: c.UploadID,
+		ChunkNo:  c.ChunkNo,
+		Error:    c.Error.Error(),
+	}
+	return json.Marshal(body)
+
+}
+
 // have a struct for chunk Job Acks
 // might change in the future for something better
 
 type ChunkJobAck struct {
 	UploadID string
 	ChunkNo  uint
+}
+
+// MarshalJSON adds a custom message field to the output
+func (c ChunkJobAck) MarshalJSON() ([]byte, error) {
+	type alias struct {
+		UploadID string `json:"uploadID"`
+		ChunkNo  uint   `json:"chunk_no"`
+		Message  string `json:"message"`
+	}
+
+	return json.Marshal(alias{
+		UploadID: c.UploadID,
+		ChunkNo:  c.ChunkNo,
+		Message:  "upload successful",
+	})
+}
+
+func main() {
+	ack := ChunkJobAck{
+		UploadID: "xyz789",
+		ChunkNo:  5,
+	}
+	data, _ := json.Marshal(ack)
+	fmt.Println(string(data))
 }
 
 // need a struct to represent error messages for chunk jobs
