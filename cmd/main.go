@@ -46,8 +46,8 @@ func main() {
 
 	// create the in memory safe map
 	// the safe map will be of type pointer to UploadSesionState
-	// the UploadSessionState holds all the necessary information about the upload session
-	safemap := p_safemap.NewSafeMap[*p_upload_session_state.UploadSessionState]()
+	// the UploadSession holds all the necessary information about the upload session
+	safemap := p_safemap.NewSafeMap[*p_upload_session_state.UploadSession]()
 
 	// need to set up the main router
 	router := setUpRouter(safemap)
@@ -75,13 +75,13 @@ func main() {
 
 }
 
-func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSessionState]) *mux.Router {
+func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSession]) *mux.Router {
 	router := mux.NewRouter()
 	router.Handle("/upload/init", getInitUploadSessionHandler(safemap)).Methods("POST")
 	return router
 }
 
-func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSessionState]) http.Handler {
+func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSession]) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// need to make sure the connection is closed
@@ -104,11 +104,11 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_st
 			return
 		}
 
-		// if there are not errors in the request body need to create a NewUploadSessionState struct
-		// I am manually adding the UploadSessionState
+		// if there are not errors in the request body need to create a NewUploadSession struct
+		// I am manually adding the UploadSession
 		// create a NewUploadSession
 		// TODO need to add some safety measures
-		safemap.Add(reqBody.UploadID, p_upload_session_state.NewUploadSessionState(nil, reqBody.UploadID, reqBody.TotalChunks, reqBody.ChunkSize, reqBody.FinalPath, reqBody.Filename))
+		safemap.Add(reqBody.UploadID, p_upload_session_state.NewUploadSession(nil, reqBody.UploadID, reqBody.TotalChunks, reqBody.ChunkSize, reqBody.FinalPath, reqBody.Filename))
 
 		// after adding it to the safe map need to send a message back to the client
 

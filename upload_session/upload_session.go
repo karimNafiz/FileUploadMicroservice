@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type UploadSessionState struct {
+type UploadSession struct {
 	Conn                          net.Conn
 	UploadID                      string
 	TotalChunks                   int
@@ -23,13 +23,13 @@ type UploadSessionState struct {
 // still in intial state do not know what this function should return
 // I will have to consider using locks
 // because the same entry could be accessed by multiple go routine
-func (u *UploadSessionState) NotifyConfirmation() {
+func (u *UploadSession) NotifyConfirmation() {
 	// keeping this function very simple right now
 	u.ChunksUploaded++
 	u.ChunksUploadedSinceLastUpdate++
 }
-func NewUploadSessionState(conn net.Conn, uploadID string, totalChunks int, chunkSize int, parentPath, fileName string) *UploadSessionState {
-	return &UploadSessionState{
+func NewUploadSession(conn net.Conn, uploadID string, totalChunks int, chunkSize int, parentPath, fileName string) *UploadSession {
+	return &UploadSession{
 		Conn:         conn,
 		UploadID:     uploadID,
 		TotalChunks:  totalChunks,

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
@@ -16,12 +17,13 @@ import (
 )
 
 // need a function for listening to tcp connections
-func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSessionState]) {
+func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		panic(err)
 	}
 	defer listener.Close()
+	log.Printf("uploading service running on port %s \n ", port)
 	// infinite foor loop
 	for {
 		// Accept a new connection
@@ -37,7 +39,7 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.Uplo
 
 }
 
-func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.UploadSessionState]) {
+func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	// create a buffered reader out of the connection
 	defer conn.Close()
 	bReader := bufio.NewReader(conn)
@@ -73,8 +75,12 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			// do something
 		}
 		switch header_body.OperationCode {
-		case global_configs.FIRSTCHUNKOPCODE:
-			// add this connection to the UploadSessionStruct stored in the safe map
+		case global_configs.UPLOADINITOPCODE:
+			upload_session_state, exists := safemap.Get(header_body.UploadID)
+			if !exists {
+				// if it doesnt exists think of a solution
+				// we have send back to the client to communicate first with the main service
+			}
 
 		case global_configs.UPLOADCHUNKOPCODE:
 
