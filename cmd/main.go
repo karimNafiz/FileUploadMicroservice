@@ -36,6 +36,8 @@ func main() {
 		return
 	}
 	// now need to start the error checking worker pool
+	// need to change this code
+	// pass a callback
 	err = p_chunk_job.StartErrorHandlerPool(ctx, 4)
 	if err != nil {
 		cancel()

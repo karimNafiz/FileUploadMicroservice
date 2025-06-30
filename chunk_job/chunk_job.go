@@ -27,6 +27,9 @@ type ChunkJob struct {
 	parentPath string // Base directory path where chunk files should be stored
 	chunkNO    uint   // Sequence number of this chunk within the upload
 	data       []byte // Raw payload bytes for this chunk
+
+	ack_channel chan *ChunkJobAck
+	err_channel chan *ChunkJobError
 }
 
 // String returns a concise description of the ChunkJob for logging.
@@ -101,14 +104,14 @@ func (c ChunkJobAck) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func main() {
-	ack := ChunkJobAck{
-		UploadID: "xyz789",
-		ChunkNo:  5,
-	}
-	data, _ := json.Marshal(ack)
-	fmt.Println(string(data))
-}
+// func main() {
+// 	ack := ChunkJobAck{
+// 		UploadID: "xyz789",
+// 		ChunkNo:  5,
+// 	}
+// 	data, _ := json.Marshal(ack)
+// 	fmt.Println(string(data))
+// }
 
 // need a struct to represent error messages for chunk jobs
 // it should contain the uploadID, chunkNO, error_message
@@ -193,8 +196,7 @@ func StartJobConfirmationHandlerPool(ctx context.Context, handlerCount uint) err
 					// if the context is closed we just return and the go routine is stopped
 					return
 				case confirmedJob := <-bufferedChunkJobChannelInstance.jobConfirmation:
-
-					//handleConfirmedJob(confirmedJob, safemap)
+					handle_job_confirmation(confirmedJob)
 				}
 
 			}
@@ -221,7 +223,7 @@ func StartErrorHandlerPool(ctx context.Context, handlerCount uint) error {
 					return
 				case failedJob := <-bufferedChunkJobChannelInstance.jobErrors:
 					// Process the failed job (e.g., retry or mark failed in DB)
-					handleFailedJob(failedJob)
+					handle_job_failed(failedJob)
 				}
 			}
 		}(i)
@@ -290,19 +292,30 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 
 }
 
+func handle_job_confirmation(chunk_job *ChunkJob) {
+	chunk_job.ack_channel <- &ChunkJobAck{UploadID: chunk_job.uploadID, ChunkNo: chunk_job.chunkNO}
+
+}
+
+func handle_job_failed(chunk_job *ChunkJob) {
+	chunk_job.err_channel <- &ChunkJobError{UploadID: chunk_job.uploadID, ChunkNo: chunk_job.chunkNO}
+}
+
 // -----------------------------------------------------------------------------
 // Consumer logic (errors)
 // -----------------------------------------------------------------------------
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! depricated code !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 // handleFailedJob processes a job that failed writing. You can implement:
 // - retry logic (e.g., re-enqueue after backoff)
 // - updating database status or metrics
 // - alerting or logging details
-func handleFailedJob(job *ChunkJob) {
-	// TODO: implement retry policies, metrics, or DB updates
-	//logger.ErrorLogger.Printf("handling failed job: %s", job.String())
+// func handleFailedJob(job *ChunkJob) {
+// 	// TODO: implement retry policies, metrics, or DB updates
+// 	//logger.ErrorLogger.Printf("handling failed job: %s", job.String())
 
-}
+// }
 
 // might have to review this architecture
 // because currently handleConfirmedJob doesnt seem like it deserves it own channel
@@ -319,3 +332,16 @@ func handleFailedJob(job *ChunkJob) {
 // }
 
 // need the function create chunk job
+
+// func GetFuncOnAck(ack_channel chan<- *ChunkJobAck) func(*ChunkJob) {
+
+// 	return func(chunk_job *ChunkJob) {
+
+// 		chunk_job_ack := &ChunkJobAck{
+// 			UploadID: chunk_job.uploadID,
+// 			ChunkNo:  chunk_job.chunkNO,
+// 		}
+// 		ack_channel <- chunk_job_ack
+// 	}
+
+// }
