@@ -18,13 +18,18 @@ import (
 
 // need a function for listening to tcp connections
 func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
+	// listen on the port provided
 	listener, err := net.Listen("tcp", port)
+	// if err, panic to shut down this service
 	if err != nil {
 		panic(err)
 	}
+	// make sure to close the listener no matter what happens
 	defer listener.Close()
+
 	log.Printf("uploading service running on port %s \n ", port)
 	// infinite foor loop
+	// in an infinite loop keep on listening for new connection s
 	for {
 		// Accept a new connection
 		conn, err := listener.Accept()
@@ -41,7 +46,12 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.Uplo
 
 func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	// create a buffered reader out of the connection
+	// make sure to close the connection after the session is complete
+	// TODO, need timeouts for the session, if the session has no activity in certain period of time close the connection
+
 	defer conn.Close()
+	// create a buffered reader my fav thing
+	// without a buffered reader I don't know what are you gonna do
 	bReader := bufio.NewReader(conn)
 
 	// read fixed size header
@@ -88,7 +98,7 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 				// issues with reading chunks
 				// need to send the sender a message
 			}
-			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), upload_session_state.ParentPath, chunk_buffer)
+			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), upload_session_state.ParentPath, chunk_buffer, upload_session_state.Acks, upload_session_state.Err)
 			// need to add this chunk job to the thread pool
 			p_chunk_job.AddChunkJob(chunk_job)
 		case global_configs.UPLOADFINISHOPCODE:
