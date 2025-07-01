@@ -268,6 +268,8 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 	if err := os.MkdirAll(job.parentPath, 0755); err != nil {
 		// Log and push the failed job onto jobErrors
 		//logger.ErrorLogger.Printf("[%s] mkdir error: %v", job.String(), err)
+		fmt.Println("error writing chunk job ")
+		fmt.Println(err.Error())
 		errChannel <- job
 		return
 	}
@@ -276,6 +278,8 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		//logger.ErrorLogger.Printf("[%s] open file error: %v", job.String(), err)
+		fmt.Println("error writing chunk job ")
+		fmt.Println(err.Error())
 		errChannel <- job
 		return
 	}
@@ -284,12 +288,16 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 	// Write the chunk data to disk.
 	if _, err := f.Write(job.data); err != nil {
 		//logger.ErrorLogger.Printf("[%s] write error: %v", job.String(), err)
+		fmt.Println("error writing chunk job ")
+		fmt.Println(err.Error())
 		errChannel <- job
 		return
 	}
 	// Success: log the successful write.
 	// if the write is successful
 	// then we will push this to the jobConfirmedPool
+	fmt.Println("chunk job successfully written onto disk")
+	fmt.Println(job.String())
 	confirmedChannel <- job
 
 }
