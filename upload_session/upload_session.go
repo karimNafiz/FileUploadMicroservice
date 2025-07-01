@@ -41,7 +41,25 @@ func (u *UploadSession) NotifyConfirmation() {
 	// keeping this function very simple right now
 	u.ChunksUploaded++
 	u.ChunksUploadedSinceLastUpdate++
+
+	u.check_if_upload_complete()
 }
+func (u *UploadSession) check_if_upload_complete() {
+	// if chunks uploaded less than
+	// total chunks
+	// that means uploading not complete
+	if u.ChunksUploaded < u.TotalChunks {
+		return
+	}
+	// if uploading complete
+	// then we push a empty struct{} onto the channel
+
+	// this code will block for sure
+	// REMEMBER THIS, this is why AI is not the answer
+	u.Done <- struct{}{}
+
+}
+
 func NewUploadSession(conn net.Conn, uploadID string, totalChunks int, chunkSize int, parentPath, fileName string) *UploadSession {
 	return &UploadSession{
 		Conn:         conn,

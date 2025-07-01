@@ -173,6 +173,7 @@ func StartWorkerPool(ctx context.Context, poolSize uint) error {
 				select {
 				case <-ctx.Done():
 					// Graceful shutdown: stop processing when context is canceled
+					fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! signalling the worker thread to stop ")
 					return
 				case job := <-bufferedChunkJobChannelInstance.jobs:
 					// Received a chunk job → attempt to write
