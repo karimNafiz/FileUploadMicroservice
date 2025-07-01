@@ -67,7 +67,8 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 		if err != nil {
 			// request error need to let the sender know
 		}
-
+		// i don't really like this code
+		// TODO find a better solution than getting the upload_session from the safe map everytime we get message
 		upload_session_state, flag := safemap.Get(header_body.UploadID)
 		if !flag {
 			// huge fucking issue

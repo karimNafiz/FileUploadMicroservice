@@ -1,5 +1,9 @@
 package safemap
 
+// TODO need to fix a lock
+// or else both readers and writers will get locked
+// go through the code again
+
 // need to import the sync package
 import (
 	"sync"

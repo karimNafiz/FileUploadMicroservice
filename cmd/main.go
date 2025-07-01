@@ -8,6 +8,8 @@ import (
 	"net/http"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
+	"github.com/file_upload_microservice/global_configs"
+	p_global_configs "github.com/file_upload_microservice/global_configs"
 	p_safemap "github.com/file_upload_microservice/safemap"
 	p_tcp_core "github.com/file_upload_microservice/tcp_core"
 	p_upload_session_state "github.com/file_upload_microservice/upload_session"
@@ -21,14 +23,14 @@ func main() {
 	// instantiating the buffered chunk job channel
 	// currently hard coding it to four
 	// should change it later
-	p_chunk_job.InstantiateBufferedChunkJobChannel(10)
+	p_chunk_job.InstantiateBufferedChunkJobChannel(p_global_configs.CHUNKJOBCHANNELBUFFERSIZE)
 
 	// now need to start the worker pool
 	// for that need to create a background context so that I can stop the context and all the derived go routines
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// now need to start creating the worker pool
-	err := p_chunk_job.StartWorkerPool(ctx, 4)
+	err := p_chunk_job.StartWorkerPool(ctx, global_configs.CHUNKJOBWORKERPOOL)
 
 	// if there is an error cancel the context
 	if err != nil {
@@ -38,9 +40,15 @@ func main() {
 	// now need to start the error checking worker pool
 	// need to change this code
 	// pass a callback
-	err = p_chunk_job.StartErrorHandlerPool(ctx, 4)
+	err = p_chunk_job.StartErrorHandlerPool(ctx, global_configs.CHUNKJOBERRPOOL)
 	if err != nil {
 		cancel()
+		return
+	}
+
+	err = p_chunk_job.StartJobConfirmationHandlerPool(ctx, global_configs.CHUNKJOBCONFIRMATIONWORKERPOOL)
+	if err != nil {
+		cancel() // this is the context
 		return
 	}
 

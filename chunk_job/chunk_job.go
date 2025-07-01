@@ -28,8 +28,8 @@ type ChunkJob struct {
 	chunkNO    uint   // Sequence number of this chunk within the upload
 	data       []byte // Raw payload bytes for this chunk
 
-	ack_channel chan *ChunkJobAck
-	err_channel chan *ChunkJobError
+	ack_channel chan<- *ChunkJobAck
+	err_channel chan<- *ChunkJobError
 }
 
 // String returns a concise description of the ChunkJob for logging.
@@ -46,14 +46,16 @@ func (job *ChunkJob) String() string {
 // 	return fmt.Sprintf("chunkNO")
 // }
 
-func CreateChunkJob(uploadID string, chunkNO uint, baseDirectoryPath string, data []byte) *ChunkJob {
+func CreateChunkJob(uploadID string, chunkNO uint, baseDirectoryPath string, data []byte, ack_channel chan<- *ChunkJobAck, err_channel chan<- *ChunkJobError) *ChunkJob {
 	// create the parentPath
 	parentPath := filepath.Join(baseDirectoryPath, uploadID)
 	return &ChunkJob{
-		uploadID:   uploadID,
-		chunkNO:    chunkNO,
-		parentPath: parentPath,
-		data:       data,
+		uploadID:    uploadID,
+		chunkNO:     chunkNO,
+		parentPath:  parentPath,
+		data:        data,
+		ack_channel: ack_channel,
+		err_channel: err_channel,
 	}
 
 }
