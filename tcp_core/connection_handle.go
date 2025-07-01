@@ -66,7 +66,7 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 	}
 	for {
 		header_buffer, err := read_header(bReader, global_configs.HEADERlENGTH)
-
+		log.Println("read the header")
 		if err != nil {
 			// let the user
 		}
@@ -85,6 +85,8 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			// if the entry is not in the safe map, someone else un-authorized is trying to connect
 			// do something
 		}
+		log.Println("got the upload_session_related to the connection ")
+		log.Println("upload session upload ID " + header_body.UploadID)
 		switch header_body.OperationCode {
 		case global_configs.UPLOADINITOPCODE:
 			if err := init_upload_session(header_body.UploadID, safemap, conn, global_configs.CHUNKJOBWORKERPOOL*2, 16, 16); err != nil {

@@ -50,7 +50,7 @@ func (m *SafeMap[V]) Contains(key string) bool {
 
 func (m *SafeMap[V]) Get(key string) (V, bool) {
 	defer m.rw_lock.RUnlock()
-	m.rw_lock.Lock()
+	m.rw_lock.RLock()
 	val, exists := m.SafeMap[key]
 	return val, exists
 }
