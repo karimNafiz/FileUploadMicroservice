@@ -78,6 +78,9 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			fmt.Println("error unmarshalling the header err:2 ")
 			fmt.Println(err.Error())
 		}
+		fmt.Println("unmarshalled header ")
+		fmt.Println(header_body)
+
 		// i don't really like this code
 		// TODO find a better solution than getting the upload_session from the safe map everytime we get message
 		upload_session_state, flag := safemap.Get(header_body.UploadID)
@@ -180,6 +183,14 @@ func init_upload_session(uploadID string, safemap *safemap.SafeMap[*upload_sessi
 	upload_session.In = make(chan *p_chunk_job.ChunkJob, session_pool_size)
 	upload_session.Err = make(chan *p_chunk_job.ChunkJobError, session_error_pool_size)
 	upload_session.Acks = make(chan *p_chunk_job.ChunkJobAck, session_ack_pool_size)
+	// right now hard coding this one
+	// without this one
+	// this will not be a buffered channel
+	// and the session is managed by a single go-routine
+	// so if the go-routine pushesh to the done channel
+	// it will be parked
+	// TODO learn about the parking mechanism again
+	upload_session.Done = make(chan struct{}, 1)
 
 	// this dispatcher go function
 	go func() {
@@ -204,10 +215,13 @@ func init_upload_session(uploadID string, safemap *safemap.SafeMap[*upload_sessi
 				tcp_socket.Write(bytes)
 				// write back to the connection
 			case chunk_job_ack := <-upload_session.Acks:
+				// when there is an ack
+				// i need to notify the upload session
 				bytes, err := chunk_job_ack.MarshalJSON()
 				if err != nil {
 					// don't know what to really do
 				}
+				upload_session.NotifyConfirmation()
 				tcp_socket.Write(bytes)
 			case <-upload_session.Done:
 				return
