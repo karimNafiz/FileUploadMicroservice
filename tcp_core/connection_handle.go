@@ -66,24 +66,23 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 	}
 	for {
 		header_buffer, err := read_header(bReader, global_configs.HEADERlENGTH)
-		log.Println("read the header")
 		if err != nil {
-			// let the user
+			fmt.Println("error reading header bytes err:1")
+			fmt.Println(err.Error())
 		}
 
 		// decode the buffer into an map object
 		err = json.Unmarshal(header_buffer, &header_body)
 
 		if err != nil {
-			// request error need to let the sender know
+			fmt.Println("error unmarshalling the header err:2 ")
+			fmt.Println(err.Error())
 		}
 		// i don't really like this code
 		// TODO find a better solution than getting the upload_session from the safe map everytime we get message
 		upload_session_state, flag := safemap.Get(header_body.UploadID)
 		if !flag {
-			// huge fucking issue
-			// if the entry is not in the safe map, someone else un-authorized is trying to connect
-			// do something
+			fmt.Println("error could not find the upload session err:3")
 		}
 		log.Println("got the upload_session_related to the connection ")
 		log.Println("upload session upload ID " + header_body.UploadID)
@@ -167,6 +166,9 @@ func init_upload_session(uploadID string, safemap *safemap.SafeMap[*upload_sessi
 	// TODO consider creating a buffered Writer from the conn in here
 	// first read about bufferedWriter toh
 
+	// need to remove this code and send the upload session as an function argument
+	// becuase I am already finding out the upload session
+	// TODO : read the lines above
 	upload_session, exists := safemap.Get(uploadID)
 	if !exists {
 		return errors.New("UploadSession does not exist")
