@@ -78,23 +78,22 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			fmt.Println("error unmarshalling the header err:2 ")
 			fmt.Println(err.Error())
 		}
-		fmt.Println("unmarshalled header ")
-		fmt.Println(header_body)
-
 		// i don't really like this code
 		// TODO find a better solution than getting the upload_session from the safe map everytime we get message
 		upload_session_state, flag := safemap.Get(header_body.UploadID)
 		if !flag {
 			fmt.Println("error could not find the upload session err:3")
 		}
-		log.Println("got the upload_session_related to the connection ")
-		log.Println("upload session upload ID " + header_body.UploadID)
+		//log.Println("got the upload_session_related to the connection ")
+		//log.Println("upload session upload ID " + header_body.UploadID)
 		switch header_body.OperationCode {
 		case global_configs.UPLOADINITOPCODE:
-			if err := init_upload_session(header_body.UploadID, safemap, conn, global_configs.CHUNKJOBWORKERPOOL*2, 16, 16); err != nil {
+
+			if err := init_upload_session(upload_session_state, conn, global_configs.CHUNKJOBWORKERPOOL*2, 16, 16); err != nil {
 				// need to do something
 				// this error means the Upload Session Doesn't exist
 			}
+			//fmt.Println("!!!!! Initialized the upload_session !!!!!!!!!!!!!!")
 		case global_configs.UPLOADCHUNKOPCODE:
 
 			chunk_buffer, err := read_chunk(bReader, header_body.ChunkSize)
@@ -104,7 +103,7 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			}
 			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), upload_session_state.ParentPath, chunk_buffer, upload_session_state.Acks, upload_session_state.Err)
 			// need to add this chunk job to the thread pool
-			p_chunk_job.AddChunkJob(chunk_job)
+			upload_session_state.In <- chunk_job
 		case global_configs.UPLOADFINISHOPCODE:
 			// check if all the chunks were uploaded or not
 		case global_configs.UPLOADCANCELOPCODE:
@@ -165,19 +164,9 @@ func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
 
 }
 
-func init_upload_session(uploadID string, safemap *safemap.SafeMap[*upload_session.UploadSession], tcp_socket net.Conn, session_pool_size uint, session_error_pool_size uint, session_ack_pool_size uint) error {
+func init_upload_session(upload_session *upload_session.UploadSession, tcp_socket net.Conn, session_pool_size uint, session_error_pool_size uint, session_ack_pool_size uint) error {
 	// TODO consider creating a buffered Writer from the conn in here
 	// first read about bufferedWriter toh
-
-	// need to remove this code and send the upload session as an function argument
-	// becuase I am already finding out the upload session
-	// TODO : read the lines above
-	upload_session, exists := safemap.Get(uploadID)
-	if !exists {
-		return errors.New("UploadSession does not exist")
-	}
-	// if no error
-	// then we have to add all the session data to the UploadSession
 
 	upload_session.Conn = tcp_socket
 	upload_session.In = make(chan *p_chunk_job.ChunkJob, session_pool_size)
@@ -204,6 +193,8 @@ func init_upload_session(uploadID string, safemap *safemap.SafeMap[*upload_sessi
 		for {
 			select {
 			case chunk_job := <-upload_session.In:
+				fmt.Println("added chunk job from upload_session.In into the chunk job ")
+				fmt.Println(" chunk job: " + chunk_job.String())
 				p_chunk_job.AddChunkJob(chunk_job)
 			// maybe instead of hard coding this error I need to find a better solution
 			// maybe have encode functions for those structs?

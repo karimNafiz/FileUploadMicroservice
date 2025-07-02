@@ -22,10 +22,14 @@ function sendFrame(socket, headerObj, bodyBuffer = null) {
 
 // Main
 (async () => {
+  // open a connection to the file 
   const stats = fs.statSync(FILE_PATH);
+  // get the total size in bytes
   const totalSize = stats.size;
+  // get the no of chunks
   const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
 
+  // create a tcp connection 
   const socket = net.createConnection({ host: HOST, port: parseInt(PORT, 10) }, () => {
     console.log(`Connected to ${HOST}:${PORT}`);
     // 1) INIT frame

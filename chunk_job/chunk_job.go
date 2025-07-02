@@ -147,9 +147,9 @@ var (
 func InstantiateBufferedChunkJobChannel(bufferSize uint) {
 	onceBufferChannel.Do(func() {
 		bufferedChunkJobChannelInstance = &bufferedChunkJobChannelStruct{
-			jobs: make(chan *ChunkJob, bufferSize),
-			// match error channel size to job buffer to avoid blocking writers
-			jobErrors: make(chan *ChunkJob, bufferSize),
+			jobs:            make(chan *ChunkJob, bufferSize),
+			jobConfirmation: make(chan *ChunkJob, bufferSize),
+			jobErrors:       make(chan *ChunkJob, bufferSize),
 		}
 	})
 }
