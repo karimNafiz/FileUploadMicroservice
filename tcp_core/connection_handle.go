@@ -16,6 +16,12 @@ import (
 	"github.com/file_upload_microservice/upload_session"
 )
 
+// TODO: need to encapsulate the upload session in the upload session struct
+// expose functions to start a session, by accepting a connection
+// maybe convert the connection to bWriter, to buffer the bytes to be written
+// expose functions like, Close(), Complete(),
+// encapsulate the states using make shift "enums"
+
 // need a function for listening to tcp connections
 func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	// listen on the port provided
@@ -95,19 +101,37 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			}
 			//fmt.Println("!!!!! Initialized the upload_session !!!!!!!!!!!!!!")
 		case global_configs.UPLOADCHUNKOPCODE:
-
 			chunk_buffer, err := read_chunk(bReader, header_body.ChunkSize)
 			if err != nil {
 				// issues with reading chunks
 				// need to send the sender a message
+				log.Println("error reading chunk:", err)
+				upload_session_state.Err <- &p_chunk_job.ChunkJobError{UploadID: header_body.UploadID, ChunkNo: uint(header_body.ChunkNo), Error: err}
+				continue
 			}
 			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), upload_session_state.ParentPath, chunk_buffer, upload_session_state.Acks, upload_session_state.Err)
 			// need to add this chunk job to the thread pool
 			upload_session_state.In <- chunk_job
+		// do not think i need this
+		// keep sets in the upload session
+		// case global_configs.UPLOADRETRANSMISSIONOPCODE:
+		// 	// need to handle case where there was re-transmission
 		case global_configs.UPLOADFINISHOPCODE:
+			// if the uploading is complete it doesn't matter
+			// because the front-end can do re-transmission
 			// check if all the chunks were uploaded or not
+			if !upload_session_state.IsComplete {
+				// consider if we need to send something back to the client
+				// this is a temporary solution
+				continue
+			}
+			// stop the context
+			// send the complete message
+
 		case global_configs.UPLOADCANCELOPCODE:
 			// need to do clean up
+			// need to pass a context to the go-routines that are spawned from this go-routine, if uploading is stopped
+			// we need to close all the go-routines that have spawned from this go-routine
 		}
 
 	}
@@ -208,11 +232,13 @@ func init_upload_session(upload_session *upload_session.UploadSession, tcp_socke
 			case chunk_job_ack := <-upload_session.Acks:
 				// when there is an ack
 				// i need to notify the upload session
+				// add a buffering
 				bytes, err := chunk_job_ack.MarshalJSON()
 				if err != nil {
 					// don't know what to really do
 				}
 				upload_session.NotifyConfirmation()
+				// do no simply write every chunk at once maybe
 				tcp_socket.Write(bytes)
 			case <-upload_session.Done:
 				return

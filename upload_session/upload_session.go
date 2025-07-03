@@ -21,6 +21,9 @@ type UploadSession struct {
 	ParentPath                    string
 	FileName                      string
 	LastActivity                  time.Time
+	// TODO this IsComplete is a temporary fix
+	// this is not sustainable, but current I have to use quick solutions to finish this project
+	IsComplete bool
 
 	// important for session state
 	// i can think of better names later
@@ -56,6 +59,7 @@ func (u *UploadSession) check_if_upload_complete() {
 
 	// this code will block for sure
 	// REMEMBER THIS, this is why AI is not the answer
+	u.IsComplete = true
 	u.Done <- struct{}{}
 
 }
@@ -69,5 +73,6 @@ func NewUploadSession(conn net.Conn, uploadID string, totalChunks int, chunkSize
 		ParentPath:   parentPath,
 		FileName:     fileName,
 		LastActivity: time.Now(),
+		IsComplete:   false,
 	}
 }
