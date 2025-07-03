@@ -55,6 +55,7 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 	// make sure to close the connection after the session is complete
 	// TODO, need timeouts for the session, if the session has no activity in certain period of time close the connection
 
+	// need a context variable so that all the go-routines that have spawned from the co-routine hol
 	defer conn.Close()
 	// create a buffered reader my fav thing
 	// without a buffered reader I don't know what are you gonna do
@@ -121,17 +122,36 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			// because the front-end can do re-transmission
 			// check if all the chunks were uploaded or not
 			if !upload_session_state.IsComplete {
-				// consider if we need to send something back to the client
-				// this is a temporary solution
+				// not all chunks confirmed yet: ask client to wait or retry missing
+				// this is temporary
+				msg := map[string]string{"error": "upload not complete"}
+				b, _ := json.Marshal(msg)
+				conn.Write(b)
 				continue
 			}
-			// stop the context
-			// send the complete message
+			// signal session shutdown
+			upload_session_state.Done <- struct{}{}
+			// send final complete notice
+			// maybe send status codes
+			complete := map[string]string{
+				"upload_id": header_body.UploadID,
+				"status":    "complete",
+			}
+			b, _ := json.Marshal(complete)
+			conn.Write(b)
+			return
 
 		case global_configs.UPLOADCANCELOPCODE:
-			// need to do clean up
-			// need to pass a context to the go-routines that are spawned from this go-routine, if uploading is stopped
-			// we need to close all the go-routines that have spawned from this go-routine
+			// client requests abort: tear down session
+			upload_session_state.Done <- struct{}{}
+			// send cancelled notification
+			cancelMsg := map[string]string{"upload_id": header_body.UploadID, "status": "cancelled"}
+			b, _ := json.Marshal(cancelMsg)
+			conn.Write(b)
+			return
+		default:
+			log.Println("unknown operation code:", header_body.OperationCode)
+
 		}
 
 	}
