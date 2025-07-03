@@ -23,6 +23,10 @@ import (
 // expose functions like, Close(), Complete(),
 // encapsulate the states using make shift "enums"
 
+// BIG TODO: right now the code is running on the basis that everything will run smooth
+// need to implement three sets in the upload session, that hold the chunk no's
+// one set for errors, one set for acks, one set for the chunk_no
+
 // need a function for listening to tcp connections
 func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	// listen on the port provided

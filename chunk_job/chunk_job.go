@@ -96,13 +96,13 @@ func (c ChunkJobAck) MarshalJSON() ([]byte, error) {
 	type alias struct {
 		UploadID string `json:"uploadID"`
 		ChunkNo  uint   `json:"chunk_no"`
-		Message  string `json:"message"`
+		Status   string `json:"status"`
 	}
 
 	return json.Marshal(alias{
 		UploadID: c.UploadID,
 		ChunkNo:  c.ChunkNo,
-		Message:  "upload successful",
+		Status:   "ok",
 	})
 }
 
