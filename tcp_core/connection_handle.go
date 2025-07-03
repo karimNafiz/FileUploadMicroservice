@@ -2,6 +2,7 @@ package tcp_core
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -55,7 +56,8 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 	// make sure to close the connection after the session is complete
 	// TODO, need timeouts for the session, if the session has no activity in certain period of time close the connection
 
-	// need a context variable so that all the go-routines that have spawned from the co-routine hol
+	// need a context variable so that all the go-routines that have spawned from the co-routine holding the context
+	ctx, cancel := context.WithCancel(context.Background())
 	defer conn.Close()
 	// create a buffered reader my fav thing
 	// without a buffered reader I don't know what are you gonna do
@@ -96,7 +98,7 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 		switch header_body.OperationCode {
 		case global_configs.UPLOADINITOPCODE:
 
-			if err := init_upload_session(upload_session_state, conn, global_configs.CHUNKJOBWORKERPOOL*2, 16, 16); err != nil {
+			if err := init_upload_session(ctx, upload_session_state, conn, global_configs.CHUNKJOBWORKERPOOL*2, 16, 16); err != nil {
 				// need to do something
 				// this error means the Upload Session Doesn't exist
 			}
@@ -139,6 +141,8 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			}
 			b, _ := json.Marshal(complete)
 			conn.Write(b)
+			// need to cancel the context to signal other go-routines to also stop
+			cancel()
 			return
 
 		case global_configs.UPLOADCANCELOPCODE:
@@ -148,6 +152,8 @@ func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.U
 			cancelMsg := map[string]string{"upload_id": header_body.UploadID, "status": "cancelled"}
 			b, _ := json.Marshal(cancelMsg)
 			conn.Write(b)
+			// need to cancel the context to signal other go-routines to also stop
+			cancel()
 			return
 		default:
 			log.Println("unknown operation code:", header_body.OperationCode)
@@ -208,7 +214,7 @@ func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
 
 }
 
-func init_upload_session(upload_session *upload_session.UploadSession, tcp_socket net.Conn, session_pool_size uint, session_error_pool_size uint, session_ack_pool_size uint) error {
+func init_upload_session(ctx context.Context, upload_session *upload_session.UploadSession, tcp_socket net.Conn, session_pool_size uint, session_error_pool_size uint, session_ack_pool_size uint) error {
 	// TODO consider creating a buffered Writer from the conn in here
 	// first read about bufferedWriter toh
 
@@ -261,6 +267,8 @@ func init_upload_session(upload_session *upload_session.UploadSession, tcp_socke
 				// do no simply write every chunk at once maybe
 				tcp_socket.Write(bytes)
 			case <-upload_session.Done:
+				return
+			case <-ctx.Done():
 				return
 			}
 
