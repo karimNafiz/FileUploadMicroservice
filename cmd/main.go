@@ -12,7 +12,7 @@ import (
 	p_global_configs "github.com/file_upload_microservice/global_configs"
 	p_safemap "github.com/file_upload_microservice/safemap"
 	p_tcp_core "github.com/file_upload_microservice/tcp_core"
-	p_upload_session_state "github.com/file_upload_microservice/upload_session"
+	p_upload_request "github.com/file_upload_microservice/upload_request"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -57,7 +57,7 @@ func main() {
 	// create the in memory safe map
 	// the safe map will be of type pointer to UploadSesionState
 	// the UploadSession holds all the necessary information about the upload session
-	safemap := p_safemap.NewSafeMap[*p_upload_session_state.UploadSession]()
+	safemap := p_safemap.NewSafeMap[*p_upload_request.UploadRequest]()
 
 	// need to set up the main router
 	router := setUpRouter(safemap)
@@ -85,13 +85,13 @@ func main() {
 
 }
 
-func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSession]) *mux.Router {
+func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest]) *mux.Router {
 	router := mux.NewRouter()
 	router.Handle("/upload/init", getInitUploadSessionHandler(safemap)).Methods("POST")
 	return router
 }
 
-func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_state.UploadSession]) http.Handler {
+func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest]) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// need to make sure the connection is closed
@@ -118,7 +118,13 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_session_st
 		// I am manually adding the UploadSession
 		// create a NewUploadSession
 		// TODO need to add some safety measures
-		safemap.Add(reqBody.UploadID, p_upload_session_state.NewUploadSession(nil, reqBody.UploadID, reqBody.TotalChunks, reqBody.ChunkSize, reqBody.FinalPath, reqBody.Filename))
+		safemap.Add(reqBody.UploadID, &p_upload_request.UploadRequest{
+			UploadID:    reqBody.UploadID,
+			FileName:    reqBody.Filename,
+			ParentPath:  reqBody.FinalPath,
+			TotalChunks: reqBody.TotalChunks,
+			ChunkSize:   reqBody.ChunkSize,
+		})
 
 		// after adding it to the safe map need to send a message back to the client
 

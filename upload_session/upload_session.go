@@ -76,3 +76,7 @@ func NewUploadSession(conn net.Conn, uploadID string, totalChunks int, chunkSize
 		IsComplete:   false,
 	}
 }
+
+// need a function for Start()
+// need a function NewUploadSession()
+//

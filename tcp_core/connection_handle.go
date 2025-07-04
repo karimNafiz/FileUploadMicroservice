@@ -50,10 +50,24 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.Uplo
 		}
 
 		// Handle the connection in a separate goroutine
+
+		// instead of doing go func()
+		// okay no we need the go handle_connection
+		// in the handle_connection
+		// we check if there are any problems with the connection or not
+		// if its okay we create a upload_session
 		go handle_connection(conn, safemap)
 	}
 
 }
+
+// for the handle_connection, we need two safe_maps one for upload_session and one for upload_request
+// in handle_request the client first sends a RequestUploadSessionStart
+// the server responds with ok, or some other shit that can be figured out
+// if we send ok, before that we need to create the upload session and also start the upload session
+// the upload session should handle all of the uploading and shit
+
+//func handle_connection_new(conn net.Conn,)
 
 func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	// create a buffered reader out of the connection
