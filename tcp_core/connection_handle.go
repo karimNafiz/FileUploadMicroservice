@@ -14,6 +14,7 @@ import (
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	"github.com/file_upload_microservice/global_configs"
 	"github.com/file_upload_microservice/safemap"
+	p_upload_request "github.com/file_upload_microservice/upload_request"
 	"github.com/file_upload_microservice/upload_session"
 )
 
@@ -28,7 +29,7 @@ import (
 // one set for errors, one set for acks, one set for the chunk_no
 
 // need a function for listening to tcp connections
-func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
+func StartTCPListener(port string, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
 	// listen on the port provided
 	listener, err := net.Listen("tcp", port)
 	// if err, panic to shut down this service
@@ -56,7 +57,7 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.Uplo
 		// in the handle_connection
 		// we check if there are any problems with the connection or not
 		// if its okay we create a upload_session
-		go handle_connection(conn, safemap)
+		go handle_connection_new(conn, safemap)
 	}
 
 }
@@ -67,7 +68,65 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*upload_session.Uplo
 // if we send ok, before that we need to create the upload session and also start the upload session
 // the upload session should handle all of the uploading and shit
 
-//func handle_connection_new(conn net.Conn,)
+func handle_connection_new(conn net.Conn, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
+	// prepare our JSON envelope
+	response := struct {
+		Status  int    `json:"status"`
+		Message string `json:"message"`
+	}{}
+
+	// helper to send the envelope and close out
+	sendResponse := func() {
+		if data, err := json.Marshal(response); err == nil {
+			conn.Write(data)
+		} else {
+			// fallback in case JSON marshaling ever fails
+			fmt.Fprintf(conn, `{"status":500,"message":"internal JSON error"}`)
+		}
+	}
+
+	bReader := bufio.NewReader(conn)
+	headerBuf, err := read_header(bReader, global_configs.HEADERlENGTH)
+	if err != nil {
+		response.Status = 500
+		response.Message = "error reading header of the new upload session"
+		sendResponse()
+		return
+	}
+
+	var headerBody struct {
+		UploadID      string `json:"upload_id"`
+		OperationCode uint8  `json:"operation_code"`
+		ChunkNo       int    `json:"chunk_no"`
+		ChunkSize     int    `json:"chunk_size"`
+	}
+	if err := json.Unmarshal(headerBuf, &headerBody); err != nil {
+		response.Status = 400
+		response.Message = "invalid header JSON payload"
+		sendResponse()
+		return
+	}
+
+	uploadReq, ok := safemap.Get(headerBody.UploadID)
+	if !ok {
+		response.Status = 404
+		response.Message = "upload session not registered"
+		sendResponse()
+		return
+	}
+
+	// everything’s good — send an “OK” and proceed
+	// if everything is found
+
+	// create the UploadSession
+	// start the UploadSession
+
+	response.Status = 200
+	response.Message = "upload session found"
+	sendResponse()
+
+	// …now carry on with uploadReq, headerBody.OperationCode, etc…
+}
 
 func handle_connection(conn net.Conn, safemap *safemap.SafeMap[*upload_session.UploadSession]) {
 	// create a buffered reader out of the connection
