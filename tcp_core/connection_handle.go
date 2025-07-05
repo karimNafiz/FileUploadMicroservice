@@ -2,6 +2,7 @@ package tcp_core
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -28,7 +29,7 @@ import (
 // one set for errors, one set for acks, one set for the chunk_no
 
 // need a function for listening to tcp connections
-func StartTCPListener(port string, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
+func StartTCPListener(ctx context.Context, port string, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
 	// listen on the port provided
 	listener, err := net.Listen("tcp", port)
 	// if err, panic to shut down this service
@@ -57,7 +58,7 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*p_upload_request.Up
 		// we check if there are any problems with the connection or not
 		// if its okay we create a upload_session
 
-		go handle_connection_new(conn, safemap)
+		go handle_connection_new(ctx, conn, safemap)
 	}
 
 }
@@ -68,7 +69,7 @@ func StartTCPListener(port string, safemap *safemap.SafeMap[*p_upload_request.Up
 // if we send ok, before that we need to create the upload session and also start the upload session
 // the upload session should handle all of the uploading and shit
 
-func handle_connection_new(conn net.Conn, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
+func handle_connection_new(ctx context.Context, conn net.Conn, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
 	// prepare our JSON envelope
 	response := struct {
 		Status  int    `json:"status"`
@@ -120,10 +121,11 @@ func handle_connection_new(conn net.Conn, safemap *safemap.SafeMap[*p_upload_req
 
 	// create the UploadSession
 	// right now I'm hard coding the 16, but create a const in the global_configs
-	p_upload_session.CreateUploadSession(conn, bReader, uploadReq, global_configs.CHUNKJOBCONFIRMATIONWORKERPOOL*2, 16, 16).Start()
+	p_upload_session.CreateUploadSession(conn, bReader, uploadReq, global_configs.CHUNKJOBCONFIRMATIONWORKERPOOL*2, 16, 16).Start(ctx)
 
 	// start the UploadSession
-
+	// TODO learn the front-end shit in type-script
+	// handle messaging between front and backend
 	// I was starting the upload session before sending the response maybe start it after
 	// this will solve the misalignement
 	// response.Status = 200

@@ -105,62 +105,61 @@ func CreateUploadSession(conn net.Conn, reader *bufio.Reader, upload_request *p_
 	}
 }
 
-func (upload_session *UploadSession) Start() {
+// to the start function pass the context
+func (upload_session *UploadSession) Start(ctx context.Context) {
 	// in the start loop for fuck sake
 
-	go func() {
-		// typical go for select loop
-		// need to add a timeout
-		// TODO: review the entire system
-		// to find out where exactly I need to add timeouts
+	go upload_session.handle_upload_session_channels(ctx)
+	go upload_session.read_frm_conn(ctx)
 
-		// create an encoder
-		// the encoder will be re-used for our purpose
-		// start a seperate co-routine
-		// to handle
-		for {
-			select {
-			case chunk_job := <-upload_session.In:
-				//fmt.Println("added chunk job from upload_session.In into the chunk job ")
-				//fmt.Println(" chunk job: " + chunk_job.String())
-				p_chunk_job.AddChunkJob(chunk_job)
-			// maybe instead of hard coding this error I need to find a better solution
-			// maybe have encode functions for those structs?
-			case chunk_job_error := <-upload_session.Err:
-				bytes, err := chunk_job_error.MarshalJSON()
-				if err != nil {
-					// don't really what to do in this case
-				}
-				upload_session.Writer.Write(bytes)
-				// write back to the connection
-			case chunk_job_ack := <-upload_session.Acks:
-				// when there is an ack
-				// i need to notify the upload session
-				// add a buffering
-				bytes, err := chunk_job_ack.MarshalJSON()
-				if err != nil {
-					// don't know what to really do
-				}
-				upload_session.update_session()
-				// do no simply write every chunk at once maybe
-				upload_session.Writer.Write(bytes)
-			case <-upload_session.Done:
-				fmt.Println("stdout from upload_session.Done channel ")
-				fmt.Println("all chunks written onto disk")
-				return
+}
 
+func (upload_session *UploadSession) handle_upload_session_channels(ctx context.Context) {
+	for {
+		select {
+		case chunk_job := <-upload_session.In:
+			//fmt.Println("added chunk job from upload_session.In into the chunk job ")
+			//fmt.Println(" chunk job: " + chunk_job.String())
+			p_chunk_job.AddChunkJob(chunk_job)
+		// maybe instead of hard coding this error I need to find a better solution
+		// maybe have encode functions for those structs?
+		case chunk_job_error := <-upload_session.Err:
+			bytes, err := chunk_job_error.MarshalJSON()
+			if err != nil {
+				// don't really what to do in this case
 			}
+			upload_session.Writer.Write(bytes)
+			// write back to the connection
+		case chunk_job_ack := <-upload_session.Acks:
+			// when there is an ack
+			// i need to notify the upload session
+			// add a buffering
+			bytes, err := chunk_job_ack.MarshalJSON()
+			if err != nil {
+				// don't know what to really do
+			}
+			upload_session.update_session()
+			// do no simply write every chunk at once maybe
+			upload_session.Writer.Write(bytes)
+		case <-upload_session.Done:
+			fmt.Println("stdout from upload_session.Done channel ")
+			fmt.Println("all chunks written onto disk")
+			return
+		case <-ctx.Done():
+			// when the context is done need to somehow contact the front-end client
+			// TODO: push to the Done channel of the upload_session
+			return
 
 		}
-	}()
-	upload_session.read_frm_conn()
+
+	}
 
 }
 
 // need to added context
 // to stop the entire shit
 // if the main service falls
-func (u *UploadSession) read_frm_conn() {
+func (u *UploadSession) read_frm_conn(ctx context.Context) {
 
 	var header_body struct {
 		UploadID      string `json:"upload_id"`
@@ -172,79 +171,86 @@ func (u *UploadSession) read_frm_conn() {
 		// I need to handle the situation where no data is sent
 		// ill do this later after I'm done cleaning up
 
-		header_buffer, err := read_header(u.Reader, global_configs.HEADERlENGTH)
-		if err != nil {
-			fmt.Println("error reading header bytes ")
-			fmt.Println(err.Error())
-		}
-
-		// decode the buffer into an map object
-		err = json.Unmarshal(header_buffer, &header_body)
-
-		if err != nil {
-			fmt.Println("error unmarshalling the header ")
-			fmt.Println(err.Error())
-		}
-
-		switch header_body.OperationCode {
-
-		case global_configs.UPLOADCHUNKOPCODE:
-			// read the chunk
-			chunk_buffer, err := read_chunk(u.Reader, header_body.ChunkSize)
-			// if there is an error
-			// send it to the error channel
-			if err != nil {
-				// issues with reading chunks
-				// need to send the sender a message
-				log.Println("error reading chunk:", err)
-				u.Err <- &p_chunk_job.ChunkJobError{UploadID: header_body.UploadID, ChunkNo: uint(header_body.ChunkNo), Error: err}
-				continue
-			}
-			// create a chunk job
-			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), u.UploadRequest.ParentPath, chunk_buffer, u.Acks, u.Err)
-			// add it to the upload_session's in channel
-			u.In <- chunk_job
-		case global_configs.UPLOADFINISHOPCODE:
-			// after the client has recieved acks for all the chunks
-			// its going to want to finish upload
-			if !u.IsComplete {
-				// not all chunks confirmed yet: ask client to wait or retry missing
-				// this is temporary
-				// TODO
-				// bring this to the proper format
-				msg := map[string]string{"error": "upload not complete"}
-				b, _ := json.Marshal(msg)
-				u.Writer.Write(b)
-				continue
-			}
-			// if the upload_session is also complete
-			u.Done <- struct{}{}
-			// send final complete notice
-			// maybe send status codes
-			// TOOD get appropriate status code
-			complete := map[string]string{
-				"upload_id": header_body.UploadID,
-				"status":    "complete",
-			}
-			b, _ := json.Marshal(complete)
-			u.Writer.Write(b)
-			// need to cancel the context to signal other go-routines to also stop
-			// cancel the context
-			return
-
-		case global_configs.UPLOADCANCELOPCODE:
-			// client requests abort: tear down session
-			u.Done <- struct{}{}
-			// send cancelled notification
-			// TODO : get appropriate status code
-			cancelMsg := map[string]string{"upload_id": header_body.UploadID, "status": "cancelled"}
-			b, _ := json.Marshal(cancelMsg)
-			u.Writer.Write(b)
-			// need to cancel the context to signal other go-routines to also stop
+		select {
+		case <-ctx.Done():
+			fmt.Println("context cancelled in read_frm_conn:", ctx.Err())
+			// need to return a error back to the client
 			return
 		default:
-			log.Println("unknown operation code:", header_body.OperationCode)
+			header_buffer, err := read_header(u.Reader, global_configs.HEADERlENGTH)
+			if err != nil {
+				fmt.Println("error reading header bytes ")
+				fmt.Println(err.Error())
+			}
 
+			// decode the buffer into an map object
+			err = json.Unmarshal(header_buffer, &header_body)
+
+			if err != nil {
+				fmt.Println("error unmarshalling the header ")
+				fmt.Println(err.Error())
+			}
+
+			switch header_body.OperationCode {
+
+			case global_configs.UPLOADCHUNKOPCODE:
+				// read the chunk
+				chunk_buffer, err := read_chunk(u.Reader, header_body.ChunkSize)
+				// if there is an error
+				// send it to the error channel
+				if err != nil {
+					// issues with reading chunks
+					// need to send the sender a message
+					log.Println("error reading chunk:", err)
+					u.Err <- &p_chunk_job.ChunkJobError{UploadID: header_body.UploadID, ChunkNo: uint(header_body.ChunkNo), Error: err}
+					continue
+				}
+				// create a chunk job
+				chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), u.UploadRequest.ParentPath, chunk_buffer, u.Acks, u.Err)
+				// add it to the upload_session's in channel
+				u.In <- chunk_job
+			case global_configs.UPLOADFINISHOPCODE:
+				// after the client has recieved acks for all the chunks
+				// its going to want to finish upload
+				if !u.IsComplete {
+					// not all chunks confirmed yet: ask client to wait or retry missing
+					// this is temporary
+					// TODO
+					// bring this to the proper format
+					msg := map[string]string{"error": "upload not complete"}
+					b, _ := json.Marshal(msg)
+					u.Writer.Write(b)
+					continue
+				}
+				// if the upload_session is also complete
+				u.Done <- struct{}{}
+				// send final complete notice
+				// maybe send status codes
+				// TOOD get appropriate status code
+				complete := map[string]string{
+					"upload_id": header_body.UploadID,
+					"status":    "complete",
+				}
+				b, _ := json.Marshal(complete)
+				u.Writer.Write(b)
+				// need to cancel the context to signal other go-routines to also stop
+				// cancel the context
+				return
+
+			case global_configs.UPLOADCANCELOPCODE:
+				// client requests abort: tear down session
+				u.Done <- struct{}{}
+				// send cancelled notification
+				// TODO : get appropriate status code
+				cancelMsg := map[string]string{"upload_id": header_body.UploadID, "status": "cancelled"}
+				b, _ := json.Marshal(cancelMsg)
+				u.Writer.Write(b)
+				// need to cancel the context to signal other go-routines to also stop
+				return
+			default:
+				log.Println("unknown operation code:", header_body.OperationCode)
+
+			}
 		}
 
 	}

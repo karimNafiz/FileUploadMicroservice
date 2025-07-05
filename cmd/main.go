@@ -69,7 +69,7 @@ func main() {
 		// currently start the tcp listener on port 9000
 		// currently hard coding it, need to change it later
 		// passing the safe map created
-		p_tcp_core.StartTCPListener(":9000", safemap)
+		p_tcp_core.StartTCPListener(ctx, ":9000", safemap)
 
 	}()
 
