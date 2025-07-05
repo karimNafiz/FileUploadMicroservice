@@ -3,13 +3,32 @@ package upload_session
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"time"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
+	"github.com/file_upload_microservice/global_configs"
 	p_upload_request "github.com/file_upload_microservice/upload_request"
 )
+
+/*
+	HOW THE ENTIRE SYSTEM WORKS
+	AN UPLOAD SESSION IS IN CHARGE OF TAKING CARE OF AN UPLOAD SESSION
+	IT READS THE DATA IN CHUNKS AND APPROPRIATELY PUTS IN A ONE OF ITS CHANNELS
+	IN MEAN READY TO DOWNLOADED
+	ANOTHER GO-ROUTINE IS IN CHARGE OF TAKING THE CHUNKS FROM IN TO THE CHUNK UPLOAD WORKER POOL
+	THE REASON FOR THIS DESIGN, IS SO THAT THE UPLOAD SESSION CAN SOLELY FOCUS ON READING DATA FROM THE CONNECTION
+	DOESN'T HAVE TO CONCERN ITSELF IN ACTUALLY GIVING THE CHUNKS TO THE WORKER POOL BECAUSE,
+	IMAGINE THERE ARE X WORKERS, AND IF X OF THEM ARE BUSY THEN THE UPLOAD SESSION WOULD BLOCK
+	SO TO NEGATE THAT SITUATION, THE UPLOAD SESSION HAS AN "IN" CHANNEL WHICH IS LARGER THAN THE WORKER POOL
+	SO THAT IT PROVIDES A BUFFER
+*/
 
 // for this upload session I need to have
 // channel chunk request
@@ -71,9 +90,8 @@ func (u *UploadSession) check_if_upload_complete() {
 
 }
 
-func CreateUploadSession(ctx context.Context, conn net.Conn, reader *bufio.Reader, upload_request *p_upload_request.UploadRequest, session_pool_size int, ack_pool_size int, err_pool_size int) *UploadSession {
+func CreateUploadSession(conn net.Conn, reader *bufio.Reader, upload_request *p_upload_request.UploadRequest, session_pool_size int, ack_pool_size int, err_pool_size int) *UploadSession {
 	return &UploadSession{
-		Context:       ctx,
 		UploadRequest: upload_request,
 		Writer:        conn,
 		Reader:        reader,
@@ -129,6 +147,147 @@ func (upload_session *UploadSession) Start() {
 
 		}
 	}()
+
+}
+
+// need to added context
+// to stop the entire shit
+// if the main service falls
+func (u *UploadSession) read_frm_conn() {
+
+	var header_body struct {
+		UploadID      string `json:"upload_id"`
+		OperationCode uint8  `json:"operation_code"`
+		ChunkNo       int    `json:"chunk_no"`
+		ChunkSize     int    `json:"chunk_size"`
+	}
+	for {
+		header_buffer, err := read_header(u.Reader, global_configs.HEADERlENGTH)
+		if err != nil {
+			fmt.Println("error reading header bytes ")
+			fmt.Println(err.Error())
+		}
+
+		// decode the buffer into an map object
+		err = json.Unmarshal(header_buffer, &header_body)
+
+		if err != nil {
+			fmt.Println("error unmarshalling the header ")
+			fmt.Println(err.Error())
+		}
+
+		switch header_body.OperationCode {
+
+		case global_configs.UPLOADCHUNKOPCODE:
+			// read the chunk
+			chunk_buffer, err := read_chunk(u.Reader, header_body.ChunkSize)
+			// if there is an error
+			// send it to the error channel
+			if err != nil {
+				// issues with reading chunks
+				// need to send the sender a message
+				log.Println("error reading chunk:", err)
+				u.Err <- &p_chunk_job.ChunkJobError{UploadID: header_body.UploadID, ChunkNo: uint(header_body.ChunkNo), Error: err}
+				continue
+			}
+			// create a chunk job
+			chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), u.UploadRequest.ParentPath, chunk_buffer, u.Acks, u.Err)
+			// add it to the upload_session's in channel
+			u.In <- chunk_job
+		case global_configs.UPLOADFINISHOPCODE:
+			// after the client has recieved acks for all the chunks
+			// its going to want to finish upload
+			if !u.IsComplete {
+				// not all chunks confirmed yet: ask client to wait or retry missing
+				// this is temporary
+				// TODO
+				// bring this to the proper format
+				msg := map[string]string{"error": "upload not complete"}
+				b, _ := json.Marshal(msg)
+				u.Writer.Write(b)
+				continue
+			}
+			// if the upload_session is also complete
+			u.Done <- struct{}{}
+			// send final complete notice
+			// maybe send status codes
+			// TOOD get appropriate status code
+			complete := map[string]string{
+				"upload_id": header_body.UploadID,
+				"status":    "complete",
+			}
+			b, _ := json.Marshal(complete)
+			u.Writer.Write(b)
+			// need to cancel the context to signal other go-routines to also stop
+			// cancel the context
+			return
+
+		case global_configs.UPLOADCANCELOPCODE:
+			// client requests abort: tear down session
+			u.Done <- struct{}{}
+			// send cancelled notification
+			// TODO : get appropriate status code
+			cancelMsg := map[string]string{"upload_id": header_body.UploadID, "status": "cancelled"}
+			b, _ := json.Marshal(cancelMsg)
+			u.Writer.Write(b)
+			// need to cancel the context to signal other go-routines to also stop
+			return
+		default:
+			log.Println("unknown operation code:", header_body.OperationCode)
+
+		}
+
+	}
+
+}
+
+func read_header(bReader *bufio.Reader, header_len int) ([]byte, error) {
+	// make a buffer for reading the header bytes
+	header_len_buffer := make([]byte, header_len)
+	// actually the header bytes
+	n, err := io.ReadFull(bReader, header_len_buffer[:])
+	// checking for errors
+	if n < header_len {
+		// return error not all bytes were read
+		return nil, errors.New("not all header len bytes were read")
+	}
+	// checking for errors
+	if err != nil {
+		// some io error
+		return nil, err
+	}
+	// at this point we know the header length
+	header_len = int(binary.BigEndian.Uint32(header_len_buffer))
+
+	header_buffer := make([]byte, header_len)
+
+	n, err = io.ReadFull(bReader, header_buffer)
+
+	if n < header_len {
+		// return error that not all bytes were returned
+		return nil, errors.New("not all header bytes were read")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return header_buffer, nil
+
+}
+
+func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
+	chunk_buffer := make([]byte, chunk_size)
+	n, err := io.ReadFull(bReader, chunk_buffer[:])
+
+	if n < chunk_size {
+		return nil, errors.New(" not all of the chunk is sent ")
+	}
+	if err != nil {
+
+		return nil, errors.New("reading chunk error")
+	}
+
+	return chunk_buffer, nil
 
 }
 
