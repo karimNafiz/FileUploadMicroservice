@@ -124,9 +124,11 @@ func handle_connection_new(conn net.Conn, safemap *safemap.SafeMap[*p_upload_req
 
 	// start the UploadSession
 
-	response.Status = 200
-	response.Message = "upload session found"
-	sendResponse()
+	// I was starting the upload session before sending the response maybe start it after
+	// this will solve the misalignement
+	// response.Status = 200
+	// response.Message = "upload session found"
+	// sendResponse()
 
 	// …now carry on with uploadReq, headerBody.OperationCode, etc…
 }

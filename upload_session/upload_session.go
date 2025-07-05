@@ -66,7 +66,7 @@ type UploadSession struct {
 // still in intial state do not know what this function should return
 // I will have to consider using locks
 // because the same entry could be accessed by multiple go routine
-func (u *UploadSession) NotifyConfirmation() {
+func (u *UploadSession) update_session() {
 	// keeping this function very simple right now
 	u.ChunksUploaded++
 	u.ChunksUploadedSinceLastUpdate++
@@ -77,6 +77,8 @@ func (u *UploadSession) check_if_upload_complete() {
 	// if chunks uploaded less than
 	// total chunks
 	// that means uploading not complete
+	fmt.Printf("total chunks uploaded %d ", u.ChunksUploaded)
+
 	if u.ChunksUploaded < u.UploadRequest.TotalChunks {
 		return
 	}
@@ -99,6 +101,7 @@ func CreateUploadSession(conn net.Conn, reader *bufio.Reader, upload_request *p_
 		In:            make(chan *p_chunk_job.ChunkJob, session_pool_size),
 		Acks:          make(chan *p_chunk_job.ChunkJobAck, ack_pool_size),
 		Err:           make(chan *p_chunk_job.ChunkJobError, err_pool_size),
+		Done:          make(chan struct{}, 1), // very important need to make it of size 1 or-else you are fucked or else there will be a deadlock
 	}
 }
 
@@ -113,11 +116,13 @@ func (upload_session *UploadSession) Start() {
 
 		// create an encoder
 		// the encoder will be re-used for our purpose
+		// start a seperate co-routine
+		// to handle
 		for {
 			select {
 			case chunk_job := <-upload_session.In:
-				fmt.Println("added chunk job from upload_session.In into the chunk job ")
-				fmt.Println(" chunk job: " + chunk_job.String())
+				//fmt.Println("added chunk job from upload_session.In into the chunk job ")
+				//fmt.Println(" chunk job: " + chunk_job.String())
 				p_chunk_job.AddChunkJob(chunk_job)
 			// maybe instead of hard coding this error I need to find a better solution
 			// maybe have encode functions for those structs?
@@ -136,17 +141,19 @@ func (upload_session *UploadSession) Start() {
 				if err != nil {
 					// don't know what to really do
 				}
-				upload_session.NotifyConfirmation()
+				upload_session.update_session()
 				// do no simply write every chunk at once maybe
 				upload_session.Writer.Write(bytes)
 			case <-upload_session.Done:
+				fmt.Println("stdout from upload_session.Done channel ")
+				fmt.Println("all chunks written onto disk")
 				return
-			case <-upload_session.Context.Done():
-				return
+
 			}
 
 		}
 	}()
+	upload_session.read_frm_conn()
 
 }
 
@@ -162,6 +169,9 @@ func (u *UploadSession) read_frm_conn() {
 		ChunkSize     int    `json:"chunk_size"`
 	}
 	for {
+		// I need to handle the situation where no data is sent
+		// ill do this later after I'm done cleaning up
+
 		header_buffer, err := read_header(u.Reader, global_configs.HEADERlENGTH)
 		if err != nil {
 			fmt.Println("error reading header bytes ")
@@ -339,7 +349,7 @@ func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
 // 				if err != nil {
 // 					// don't know what to really do
 // 				}
-// 				upload_session.NotifyConfirmation()
+// 				upload_session.update_session()
 // 				// do no simply write every chunk at once maybe
 // 				tcp_socket.Write(bytes)
 // 			case <-upload_session.Done:

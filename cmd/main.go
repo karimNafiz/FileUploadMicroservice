@@ -131,7 +131,7 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.Up
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Upload Session Created",
+			"message": "Upload Request Created",
 		})
 
 	})
