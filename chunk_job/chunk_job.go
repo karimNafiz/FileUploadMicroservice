@@ -10,9 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
 	//p_safemap "github.com/file_upload_microservice/safemap"
 	//p_upload_session "github.com/file_upload_microservice/upload_session"
 	// logger "docTrack/logger"
+
+	p_global_configs "github.com/file_upload_microservice/global_configs"
 )
 
 // -----------------------------------------------------------------------------
@@ -35,6 +38,24 @@ type ChunkJob struct {
 // String returns a concise description of the ChunkJob for logging.
 func (job *ChunkJob) String() string {
 	return fmt.Sprintf("ChunkJob(upload=%s, chunk=%d)", job.uploadID, job.chunkNO)
+}
+
+// this function will be required for the getting parent_folder_name for the chunks
+// TODO reconsider if this function belongs to the chunk job struct
+// the reason im making these into seperate functions
+// this allows to make changes without touching the other functions
+func (job *ChunkJob) get_parent_folder_path() string {
+	return filepath.Join(p_global_configs.CHUNKUPLOADROOTFOLDERPATH, job.parentPath)
+}
+func (job *ChunkJob) get_chunk_name() string {
+	return fmt.Sprintf("chunk_no:%05d", job.chunkNO)
+}
+
+// need global configs here
+// I know this is ugly but im trying to finish version quickly
+// so bare with me
+func (job *ChunkJob) get_chunk_upload_destination_path() string {
+	return filepath.Join(job.get_parent_folder_path(), job.get_chunk_name())
 }
 
 // need to get the chunk file name
@@ -261,12 +282,12 @@ func AddChunkJob(job *ChunkJob) error {
 // into the provided errChannel for separate handling.
 func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel chan<- *ChunkJob) {
 	// so the filePath would be tempUploadDir/uploadID(ChunkJob)/ChunkJob.String() whatever string returns
-	filePath := filepath.Join(job.parentPath, job.String())
+	//filePath := filepath.Join(job.parentPath, job.String())
 
 	// Ensure parent directory exists, creating any missing folders.
 	// TODO: maybe optimize this step,
 	// if all the folders exist, doesnt return any error
-	if err := os.MkdirAll(job.parentPath, 0755); err != nil {
+	if err := os.MkdirAll(job.get_parent_folder_path(), 0755); err != nil {
 		// Log and push the failed job onto jobErrors
 		//logger.ErrorLogger.Printf("[%s] mkdir error: %v", job.String(), err)
 		fmt.Println("error writing chunk job ")
@@ -276,7 +297,7 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 	}
 
 	// Open or truncate the file for writing.
-	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(job.get_chunk_upload_destination_path(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		//logger.ErrorLogger.Printf("[%s] open file error: %v", job.String(), err)
 		fmt.Println("error writing chunk job ")

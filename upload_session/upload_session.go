@@ -28,6 +28,9 @@ import (
 	IMAGINE THERE ARE X WORKERS, AND IF X OF THEM ARE BUSY THEN THE UPLOAD SESSION WOULD BLOCK
 	SO TO NEGATE THAT SITUATION, THE UPLOAD SESSION HAS AN "IN" CHANNEL WHICH IS LARGER THAN THE WORKER POOL
 	SO THAT IT PROVIDES A BUFFER
+
+	// FOR THE SECOND VERSION CONSIDER WRITING CHUNKS DIRECTLY INTO THE DESTINATION FILE, WITH NO AFTER UPLOAD MERGE STEP
+	// FOR VERSION ONE AFTER UPLOAD MERGE STEP IS OAKY NP
 */
 
 // for this upload session I need to have
@@ -88,7 +91,10 @@ func (u *UploadSession) check_if_upload_complete() {
 	// this code will block for sure
 	// REMEMBER THIS, this is why AI is not the answer
 	u.IsComplete = true
+	// WARNING this is a potential source of dead-lock for later versions of this project
+	// I need to design a more robust system
 	u.Done <- struct{}{}
+	// in this step considering putting in the merge step
 
 }
 
@@ -223,10 +229,21 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 					continue
 				}
 				// if the upload_session is also complete
-				u.Done <- struct{}{}
+				// this sneaking line of code is causing deadlocks
+				// u.Done <- struct{}{}
 				// send final complete notice
 				// maybe send status codes
 				// TOOD get appropriate status code
+
+				// before sending in complete
+				// TODO make seperate packages for merging and cleaning up
+				// TODO imp note make seperate package for merging and cleaning up
+				// err := merge_all_chunks()
+				// if err != nil {
+				// 	// edit the message
+				// 	// based on the error do re-try policies
+				// }
+				// err := clean_up_chunks()
 				complete := map[string]string{
 					"upload_id": header_body.UploadID,
 					"status":    "complete",
@@ -239,6 +256,8 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 
 			case global_configs.UPLOADCANCELOPCODE:
 				// client requests abort: tear down session
+				// TODO: re-consider this line of code
+				// this can potentially cause problems
 				u.Done <- struct{}{}
 				// send cancelled notification
 				// TODO : get appropriate status code
