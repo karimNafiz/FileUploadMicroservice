@@ -1,5 +1,7 @@
 package global_configs
 
+import "path/filepath"
+
 const HEADERlENGTH = 4
 
 const UPLOADINITOPCODE = 0
@@ -17,4 +19,10 @@ const CHUNKJOBERRWORKERPOOL = 1
 
 const CHUNKJOBCHANNELBUFFERSIZE = 10
 
-const CHUNKUPLOADROOTFOLDERPATH = "chunk_uploads"
+var cHUNKUPLOADROOTFOLDER string = "chunk_uploads"
+var uPLOADROOT string = "upload_root"
+
+//var CHUNKUPLOADROOTFOLDERPATH string = filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
+func CHUNKUPLOADROOTFOLDERPATH() string {
+	return filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
+}

@@ -45,10 +45,10 @@ func (job *ChunkJob) String() string {
 // the reason im making these into seperate functions
 // this allows to make changes without touching the other functions
 func (job *ChunkJob) get_parent_folder_path() string {
-	return filepath.Join(p_global_configs.CHUNKUPLOADROOTFOLDERPATH, job.parentPath)
+	return filepath.Join(p_global_configs.CHUNKUPLOADROOTFOLDERPATH(), job.uploadID)
 }
 func (job *ChunkJob) get_chunk_name() string {
-	return fmt.Sprintf("chunk_no:%05d", job.chunkNO)
+	return fmt.Sprintf("chunk_no:%05d", int(job.chunkNO))
 }
 
 // need global configs here
