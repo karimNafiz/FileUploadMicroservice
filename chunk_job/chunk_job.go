@@ -26,10 +26,10 @@ import (
 // to be written to disk (or elsewhere). All the information needed to
 // write the chunk is carried in this struct.
 type ChunkJob struct {
-	uploadID   string // Unique ID for the overall upload session
-	parentPath string // Base directory path where chunk files should be stored
-	chunkNO    uint   // Sequence number of this chunk within the upload
-	data       []byte // Raw payload bytes for this chunk
+	uploadID string // Unique ID for the overall upload session
+	// parentPath string // Base directory path where chunk files should be stored
+	chunkNO uint   // Sequence number of this chunk within the upload
+	data    []byte // Raw payload bytes for this chunk
 
 	ack_channel chan<- *ChunkJobAck
 	err_channel chan<- *ChunkJobError
@@ -48,7 +48,7 @@ func (job *ChunkJob) get_parent_folder_path() string {
 	return filepath.Join(p_global_configs.CHUNKUPLOADROOTFOLDERPATH(), job.uploadID)
 }
 func (job *ChunkJob) get_chunk_name() string {
-	return fmt.Sprintf("chunk_no:%05d", int(job.chunkNO))
+	return fmt.Sprintf("%05d.chunk", job.chunkNO)
 }
 
 // need global configs here
@@ -69,11 +69,10 @@ func (job *ChunkJob) get_chunk_upload_destination_path() string {
 
 func CreateChunkJob(uploadID string, chunkNO uint, baseDirectoryPath string, data []byte, ack_channel chan<- *ChunkJobAck, err_channel chan<- *ChunkJobError) *ChunkJob {
 	// create the parentPath
-	parentPath := filepath.Join(baseDirectoryPath, uploadID)
+	// parentPath := filepath.Join(baseDirectoryPath, uploadID)
 	return &ChunkJob{
 		uploadID:    uploadID,
 		chunkNO:     chunkNO,
-		parentPath:  parentPath,
 		data:        data,
 		ack_channel: ack_channel,
 		err_channel: err_channel,
@@ -297,6 +296,7 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 	}
 
 	// Open or truncate the file for writing.
+	fmt.Println(fmt.Sprint("path to chunk %s ", job.get_chunk_upload_destination_path()))
 	f, err := os.OpenFile(job.get_chunk_upload_destination_path(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		//logger.ErrorLogger.Printf("[%s] open file error: %v", job.String(), err)
