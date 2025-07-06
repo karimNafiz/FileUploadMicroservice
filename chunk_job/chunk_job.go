@@ -112,7 +112,7 @@ type ChunkJobAck struct {
 }
 
 // MarshalJSON adds a custom message field to the output
-func (c ChunkJobAck) MarshalJSON() ([]byte, error) {
+func (c *ChunkJobAck) MarshalJSON() ([]byte, error) {
 	type alias struct {
 		UploadID string `json:"uploadID"`
 		ChunkNo  uint   `json:"chunk_no"`
@@ -124,6 +124,10 @@ func (c ChunkJobAck) MarshalJSON() ([]byte, error) {
 		ChunkNo:  c.ChunkNo,
 		Status:   "ok",
 	})
+}
+
+func (c *ChunkJobAck) String() string {
+	return fmt.Sprintf(" chunk job ack: chunk no %d ", c.ChunkNo)
 }
 
 // func main() {
@@ -295,8 +299,6 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 		return
 	}
 
-	// Open or truncate the file for writing.
-	fmt.Println(fmt.Sprint("path to chunk %s ", job.get_chunk_upload_destination_path()))
 	f, err := os.OpenFile(job.get_chunk_upload_destination_path(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		//logger.ErrorLogger.Printf("[%s] open file error: %v", job.String(), err)
@@ -318,8 +320,6 @@ func writeChunkAt(job *ChunkJob, errChannel chan<- *ChunkJob, confirmedChannel c
 	// Success: log the successful write.
 	// if the write is successful
 	// then we will push this to the jobConfirmedPool
-	fmt.Println("chunk job successfully written onto disk")
-	fmt.Println(job.String())
 	confirmedChannel <- job
 
 }

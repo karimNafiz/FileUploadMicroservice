@@ -10,6 +10,8 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
@@ -61,6 +63,14 @@ type UploadSession struct {
 	Acks    chan *p_chunk_job.ChunkJobAck
 	Context context.Context
 	Done    chan struct{}
+}
+
+func (u *UploadSession) Close() {
+	// do all the clean up here
+	// release all the memory
+	// right now its a simple .Close()
+	u.Writer.Close()
+
 }
 
 // need a function to notify a chunk has been uploaded
@@ -144,9 +154,12 @@ func (upload_session *UploadSession) handle_upload_session_channels(ctx context.
 			if err != nil {
 				// don't know what to really do
 			}
-			upload_session.update_session()
 			// do no simply write every chunk at once maybe
 			upload_session.Writer.Write(bytes)
+			// important note im putting this function after writing to the network
+			fmt.Println(chunk_job_ack.String())
+			// im getting some misalignement between the server and client
+			upload_session.update_session()
 		case <-upload_session.Done:
 			fmt.Println("stdout from upload_session.Done channel ")
 			fmt.Println("all chunks written onto disk")
@@ -244,12 +257,29 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 				// 	// based on the error do re-try policies
 				// }
 				// err := clean_up_chunks()
+
+				// do all of the merging
+
+				// confirm_all_chunks()
+				// merge_all_chunks()
+				// clean_all_chunks()
+				err := mergeChunks(global_configs.CHUNKUPLOADROOTFOLDERPATH(), u.UploadRequest)
+				if err != nil {
+					// TODO thing about ways to resolve this issue
+				}
+
 				complete := map[string]string{
 					"upload_id": header_body.UploadID,
 					"status":    "complete",
 				}
 				b, _ := json.Marshal(complete)
 				u.Writer.Write(b)
+
+				// very important need to close the connection
+				// u.Writer.Close()
+				u.Close()
+				cleanupChunks(global_configs.CHUNKUPLOADROOTFOLDERPATH(), u.UploadRequest)
+
 				// need to cancel the context to signal other go-routines to also stop
 				// cancel the context
 				return
@@ -324,6 +354,74 @@ func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
 
 	return chunk_buffer, nil
 
+}
+
+// confirm_all_chunks verifies that all chunk files (00001.chunk .. TotalChunks.chunk)
+// exist under the session's ParentPath. Returns an error if any are missing.
+func confirm_all_chunks(upload_root_path string, req *p_upload_request.UploadRequest) error {
+	base := filepath.Join(upload_root_path, req.UploadID)
+	for i := 1; i <= req.TotalChunks; i++ {
+		name := fmt.Sprintf("%05d.chunk", i)
+		path := filepath.Join(base, name)
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("missing chunk file: %s", name)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+// mergeChunks concatenates all chunk files into the final output file.
+// It opens (or creates) req.FilePath and writes each chunk in order.
+func mergeChunks(upload_root_path string, req *p_upload_request.UploadRequest) error {
+	// confirm chunks first
+	if err := confirm_all_chunks(upload_root_path, req); err != nil {
+		return err
+	}
+
+	// TODO need to refactor this code
+	chunk_upload_parent_folder := filepath.Join(upload_root_path, req.UploadID)
+	// open final file
+	outPath := filepath.Join(req.ParentPath, req.FileName)
+	out, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// for each chunk:
+	for i := 1; i <= req.TotalChunks; i++ {
+		chunkName := fmt.Sprintf("%05d.chunk", i)
+		inPath := filepath.Join(chunk_upload_parent_folder, chunkName)
+		in, err := os.Open(inPath)
+		if err != nil {
+			return fmt.Errorf("opening chunk %s: %w", chunkName, err)
+		}
+		// copy
+		if _, err := io.Copy(out, in); err != nil {
+			in.Close()
+			return fmt.Errorf("writing chunk %s: %w", chunkName, err)
+		}
+		in.Close()
+	}
+	return nil
+}
+
+// cleanupChunks removes all individual chunk files.
+func cleanupChunks(upload_root_path string, req *p_upload_request.UploadRequest) error {
+	dir := filepath.Join(upload_root_path, req.UploadID)
+	var firstErr error
+	for i := 1; i <= req.TotalChunks; i++ {
+		name := fmt.Sprintf("%05d.chunk", i)
+		path := filepath.Join(dir, name)
+		err := os.Remove(path)
+		if err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("removing chunk %s: %w", name, err)
+		}
+	}
+	return firstErr
 }
 
 // 	// TODO consider creating a buffered Writer from the conn in here
