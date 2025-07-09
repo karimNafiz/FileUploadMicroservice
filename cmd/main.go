@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"net/http"
@@ -15,7 +16,14 @@ import (
 	p_upload_request "github.com/file_upload_microservice/upload_request"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+
+	//TODO when the code is refactored this package shouldn't be here
+	p_registered_service "github.com/file_upload_microservice/registered_service"
 )
+
+// TODO: refactor this file
+// rn I have put the surface level work in this entire file
+// but if it starts getting too big ill create different packages for the router and handlers
 
 func main() {
 	// need to set up the main router
@@ -91,6 +99,60 @@ func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest]) *m
 	return router
 }
 
+// take in the safemap
+func GetRegisterToFileUploadService(service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
+	get_service_id := start_service_id(-1)
+	// need a handler for main services to register to the file-upload service
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// very important to avoid memory leaks
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+		var reqBody struct {
+			Host                    string `json:"host"`
+			Scheme                  string `json:"scheme"`
+			Port                    string `json:"port"`
+			UploadStatusCallBackURL string `json:"upload_status_callback_url"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&reqBody)
+		// any error with decoding the header body
+		if err != nil {
+			// once the header is sent we can't change the header
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "bad request body",
+			})
+		}
+		// if not error decoding the body
+		// we need to create a new service
+		service_id := get_service_id()
+		service := p_registered_service.NewService(service_id, reqBody.Host, reqBody.Scheme, reqBody.Port, reqBody.UploadStatusCallBackURL)
+		// after creating the service add it to the safemap
+		// TODO implement the ID check if the id already exists
+		// for our simple case that won't be the issue
+		// but when we implement the goodleuuid, then do check
+		// even though the chances are astronomically low
+		service_map.Add(service_id, service)
+
+		// after adding the service we need to let the main service know habibi you have been added
+		// maybe we change to smth else
+		// TODO add the security feature
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]string{
+			"service_id": service_id,
+			"message":    "service registered",
+		})
+
+	})
+}
+
+func start_service_id(start_index int) func() string {
+	return func() string {
+		start_index++
+		return fmt.Sprintf("service:%d", start_index)
+	}
+}
+
 func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest]) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +198,12 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.Up
 
 	})
 }
+
+// need a post request for the main service to register itself with the file upload service
+// create a channel per-service
+// example scenario, main service registers with the file upload service
+// the file upload_service creates a channel for that 'main_service'
+//
 
 // func initUploadSession(w http.ResponseWriter, r *http.Request){
 // 	// need to make sure the connection is closed
