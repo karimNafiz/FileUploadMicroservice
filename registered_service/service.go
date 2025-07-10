@@ -2,6 +2,12 @@ package registered_service
 
 // TOOD later on store them in Databases
 // also make sure you have some security measures
+
+/// <summary>
+/// the service struct will encapsulate another application who wants to use the file upload service.
+/// for any application to use the file upload service, they must first register themself to the file upload service
+/// when an application registers itself, I will encapsulate them into the service struct
+/// </summary>
 type Service struct {
 	ServiceID string
 	Host      string

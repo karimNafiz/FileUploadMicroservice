@@ -63,6 +63,10 @@ type UploadSession struct {
 	Acks    chan *p_chunk_job.ChunkJobAck
 	Context context.Context
 	Done    chan struct{}
+
+	// i could store two function pointers
+	// func OnUploadSessionStart
+	// func OnUploadSessionEnd
 }
 
 func (u *UploadSession) Close() {

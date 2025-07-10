@@ -67,8 +67,14 @@ func main() {
 	// the UploadSession holds all the necessary information about the upload session
 	safemap := p_safemap.NewSafeMap[*p_upload_request.UploadRequest]()
 
+	// need a map of services registered to file_upload_service
+	// this map will store all the services registered to the file_upload_service
+	// TODO maybe in the future to implement rate limiting
+	// we can have a monitor go-routine
+	service_map := p_safemap.NewSafeMap[*p_registered_service.Service]()
+
 	// need to set up the main router
-	router := setUpRouter(safemap)
+	router := setUpRouter(safemap, service_map)
 
 	// need to launch this service in a different go-routine or else
 	// no code will run below this code
@@ -93,9 +99,10 @@ func main() {
 
 }
 
-func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest]) *mux.Router {
+func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
 	router := mux.NewRouter()
 	router.Handle("/upload/init", getInitUploadSessionHandler(safemap)).Methods("POST")
+	router.Handle("/register", GetRegisterToFileUploadService(service_map))
 	return router
 }
 
