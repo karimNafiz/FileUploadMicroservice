@@ -17,6 +17,8 @@ import (
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	"github.com/file_upload_microservice/global_configs"
 	p_upload_request "github.com/file_upload_microservice/upload_request"
+
+	p_message "github.com/file_upload_microservice/message"
 )
 
 /*
@@ -64,9 +66,7 @@ type UploadSession struct {
 	Context context.Context
 	Done    chan struct{}
 
-	// i could store two function pointers
-	// func OnUploadSessionStart
-	// func OnUploadSessionEnd
+	ServiceStatusChannel chan<- p_message.Message
 }
 
 func (u *UploadSession) Close() {
