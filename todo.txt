@@ -1,3 +1,7 @@
+// the numbering of todos do not represet any ordinal scaling
+
+
+todo 1
 upload session 
 in the upload session package we have two important go-routine working
 one go routine is listening for incoming data on the connection
@@ -11,5 +15,8 @@ this doesn't have to be care of right now
 get the file upload service working first with foreign service
 in version take care of this aspect
 
-
+todo 2
 upload session service status consider the benefits of having a struct representing the message being sent back to the clients
+
+todo 3
+in the service package, handle proper clean up when the context is Done

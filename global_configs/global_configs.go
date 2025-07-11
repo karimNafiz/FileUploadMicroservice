@@ -19,6 +19,8 @@ const CHUNKJOBERRWORKERPOOL = 1
 
 const CHUNKJOBCHANNELBUFFERSIZE = 10
 
+// lets start with 10
+// consider increasing it after testing the file upload service with the main file upload service
 const SERVICESTATUSNOTIFICATIONCHANNELBUFFER = 5
 
 var cHUNKUPLOADROOTFOLDER string = "chunk_uploads"

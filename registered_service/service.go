@@ -1,6 +1,8 @@
 package registered_service
 
 import (
+	"context"
+
 	p_global_configs "github.com/file_upload_microservice/global_configs"
 )
 
@@ -31,4 +33,20 @@ func NewService(id string, host string, scheme string, port string, upload_statu
 		UploadStatusCallBackURL:          upload_status_callback_url,
 		ServiceStatusNotificationChannel: make(chan *map[string]string, p_global_configs.SERVICESTATUSNOTIFICATIONCHANNELBUFFER),
 	}
+}
+
+func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
+	for {
+
+		select {
+		case <-ctx.Done():
+			// TODO
+			// using the callbackURL need to notifiy the foreign service that the file upload service is closed
+			return
+		case message <- s.ServiceStatusNotificationChannel:
+			// encode the message and then using the callback url we need to send the encoded message to the foreign service
+
+		}
+	}
+
 }
