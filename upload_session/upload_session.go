@@ -17,8 +17,6 @@ import (
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	"github.com/file_upload_microservice/global_configs"
 	p_upload_request "github.com/file_upload_microservice/upload_request"
-
-	p_message "github.com/file_upload_microservice/message"
 )
 
 /*
@@ -66,7 +64,10 @@ type UploadSession struct {
 	Context context.Context
 	Done    chan struct{}
 
-	ServiceStatusChannel chan<- p_message.Message
+	// important stuff to keep in mind make sure we push a "message" to this channel
+	// after all the essential task of the upload session is complete
+	// TODO consider if sending a pointer or a direct copy would be better
+	ServiceStatusChannel chan<- *map[string]string
 }
 
 func (u *UploadSession) Close() {
@@ -283,6 +284,15 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 				// u.Writer.Close()
 				u.Close()
 				cleanupChunks(global_configs.CHUNKUPLOADROOTFOLDERPATH(), u.UploadRequest)
+
+				// after all of the uplaoding is complete
+				message := &map[string]string{
+					"Status":   "200",
+					"UploadID": u.UploadRequest.UploadID,
+					"Message":  "upload successful",
+					"Error":    "",
+				}
+				u.ServiceStatusChannel <- message
 
 				// need to cancel the context to signal other go-routines to also stop
 				// cancel the context

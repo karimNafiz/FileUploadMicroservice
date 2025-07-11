@@ -3,9 +3,9 @@ package upload_session
 // this struct is meant to implement the message interface
 type UploadSessionServiceStatus struct {
 	IsSuccess bool
-	Status    uint   // similar to status codes in http
-	Error     string // if there is any error this field will represent that
-	Message   string // if not error then we can send generic message through this
+	Status    uint // similar to status codes in http
+
+	Message *map[string]string // if not error then we can send generic message through this
 
 }
 
@@ -21,11 +21,11 @@ func (u_status *UploadSessionServiceStatus) GetStatus() uint {
 	return u_status.Status
 }
 
-func (u_status *UploadSessionServiceStatus) GetError() string {
-	return u_status.Error
-}
+// func (u_status *UploadSessionServiceStatus) GetError() string {
+// 	return u_status.Error
+// }
 
-func (u_status *UploadSessionServiceStatus) GetMessage() string {
+func (u_status *UploadSessionServiceStatus) GetMessage() *map[string]string {
 	return u_status.Message
 }
 

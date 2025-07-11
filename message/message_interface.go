@@ -16,6 +16,5 @@ package message
 type Message interface {
 	IsSuccessful() bool // need to check if the request operation by the foreign service was successful or not
 	GetStatus() string  // return a pointer to a map of type key : string and value: string
-	GetError() string
-	GetMessage() string
+	GetMessage() *map[string]string
 }

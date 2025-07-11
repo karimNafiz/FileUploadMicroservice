@@ -1,13 +1,17 @@
 package registered_service
 
+import (
+	p_global_configs "github.com/file_upload_microservice/global_configs"
+)
+
 // TOOD later on store them in Databases
 // also make sure you have some security measures
 
-/// <summary>
-/// the service struct will encapsulate another application who wants to use the file upload service.
-/// for any application to use the file upload service, they must first register themself to the file upload service
-/// when an application registers itself, I will encapsulate them into the service struct
-/// </summary>
+// / <summary>
+// / the service struct will encapsulate another application who wants to use the file upload service.
+// / for any application to use the file upload service, they must first register themself to the file upload service
+// / when an application registers itself, I will encapsulate them into the service struct
+// / </summary>
 type Service struct {
 	ServiceID string
 	Host      string
@@ -15,14 +19,16 @@ type Service struct {
 	Port      string
 	// when an upload session is complete
 	// we need to notify the main service that the job that they requested is complete, failed and stuff
-	UploadStatusCallBackURL string
+	UploadStatusCallBackURL          string
+	ServiceStatusNotificationChannel chan *map[string]string
 }
 
 func NewService(id string, host string, scheme string, port string, upload_status_callback_url string) *Service {
 	return &Service{
-		ServiceID:               id,
-		Host:                    host,
-		Port:                    port,
-		UploadStatusCallBackURL: upload_status_callback_url,
+		ServiceID:                        id,
+		Host:                             host,
+		Port:                             port,
+		UploadStatusCallBackURL:          upload_status_callback_url,
+		ServiceStatusNotificationChannel: make(chan *map[string]string, p_global_configs.SERVICESTATUSNOTIFICATIONCHANNELBUFFER),
 	}
 }

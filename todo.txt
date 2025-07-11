@@ -1,0 +1,15 @@
+upload session 
+in the upload session package we have two important go-routine working
+one go routine is listening for incoming data on the connection
+the other go routine is handling all the channel for that go routine
+but nothing ties them together
+if one go routines fails or stop for reasons not taken through code
+we will have a go-routine leak
+first introduce timeouts
+secondly use a context to connect both the go-routines
+this doesn't have to be care of right now
+get the file upload service working first with foreign service
+in version take care of this aspect
+
+
+upload session service status consider the benefits of having a struct representing the message being sent back to the clients
