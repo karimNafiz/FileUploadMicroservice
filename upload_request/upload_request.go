@@ -2,6 +2,7 @@ package upload_request
 
 type UploadRequest struct {
 	UploadID    string
+	ServiceID   string
 	ChunkSize   int
 	TotalChunks int
 	FileName    string

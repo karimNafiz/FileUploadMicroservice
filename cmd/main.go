@@ -21,33 +21,25 @@ import (
 	p_registered_service "github.com/file_upload_microservice/registered_service"
 )
 
-// TODO: refactor this file
-// rn I have put the surface level work in this entire file
-// but if it starts getting too big ill create different packages for the router and handlers
+// TODO: refactor the package.
+// Currently, this package has functions that do not belong here
 
 func main() {
-	// need to set up the main router
 
-	// instantiating the buffered chunk job channel
-	// currently hard coding it to four
-	// should change it later
 	p_chunk_job.InstantiateBufferedChunkJobChannel(p_global_configs.CHUNKJOBCHANNELBUFFERSIZE)
-
-	// now need to start the worker pool
-	// for that need to create a background context so that I can stop the context and all the derived go routines
+	// need parent context
+	// to stop cascading operations when the main go-routine stops
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// now need to start creating the worker pool
 	err := p_chunk_job.StartWorkerPool(ctx, global_configs.CHUNKJOBWORKERPOOL)
 
-	// if there is an error cancel the context
+	// if there are errors with starting the worker pool
+	// we return and cancel the context
 	if err != nil {
 		cancel()
 		return
 	}
-	// now need to start the error checking worker pool
-	// need to change this code
-	// pass a callback
+
 	err = p_chunk_job.StartErrorHandlerPool(ctx, global_configs.CHUNKJOBERRPOOL)
 	if err != nil {
 		cancel()
@@ -56,25 +48,22 @@ func main() {
 
 	err = p_chunk_job.StartJobConfirmationHandlerPool(ctx, global_configs.CHUNKJOBCONFIRMATIONWORKERPOOL)
 	if err != nil {
-		cancel() // this is the context
+		cancel()
 		return
 	}
 
-	// need to start the chunk_job_confirmation worker pool
-
-	// create the in memory safe map
-	// the safe map will be of type pointer to UploadSesionState
-	// the UploadSession holds all the necessary information about the upload session
+	// when a foreign service, requests an upload session
+	// before starting an upload session we will create an upload request object
+	// TODO: create a monitoring go-routine on this safe map
+	// such that when an upload request stays in memory for too long we will remove it and let the foreign service know
 	safemap := p_safemap.NewSafeMap[*p_upload_request.UploadRequest]()
 
-	// need a map of services registered to file_upload_service
-	// this map will store all the services registered to the file_upload_service
-	// TODO maybe in the future to implement rate limiting
-	// we can have a monitor go-routine
+	// this map will store all the active foreign services
+	// that are using the file uplaoding service
 	service_map := p_safemap.NewSafeMap[*p_registered_service.Service]()
 
-	// need to set up the main router
-	router := setUpRouter(safemap, service_map)
+	// set up router  to different handlers
+	router := setUpRouter(ctx, safemap, service_map)
 
 	// need to launch this service in a different go-routine or else
 	// no code will run below this code
@@ -87,6 +76,9 @@ func main() {
 
 	}()
 
+	// TODO: remove this code when testing phase is over
+	// study CORS policy
+	// set up the proper CORS policy
 	cors := handlers.CORS(
 		handlers.AllowedOrigins([]string{"http://localhost:3000"}), // your UI origin
 		handlers.AllowedMethods([]string{"GET", "POST", "DELETE", "OPTIONS"}),
@@ -99,15 +91,15 @@ func main() {
 
 }
 
-func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
+func setUpRouter(parent_ctx context.Context, safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
 	router := mux.NewRouter()
 	router.Handle("/upload/init", getInitUploadSessionHandler(safemap)).Methods("POST")
-	router.Handle("/register", GetRegisterToFileUploadService(service_map))
+	router.Handle("/register", GetRegisterToFileUploadService(parent_ctx, service_map))
 	return router
 }
 
 // take in the safemap
-func GetRegisterToFileUploadService(service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
+func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
 	get_service_id := start_service_id(-1)
 	// need a handler for main services to register to the file-upload service
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +133,11 @@ func GetRegisterToFileUploadService(service_map *p_safemap.SafeMap[*p_registered
 		// even though the chances are astronomically low
 		service_map.Add(service_id, service)
 
+		// after adding to the service_map
+		// we will start the service
+		// sending the parent context
+		service.Start(parent_ctx)
+
 		// after adding the service we need to let the main service know habibi you have been added
 		// maybe we change to smth else
 		// TODO add the security feature
@@ -173,6 +170,7 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.Up
 			FinalPath   string `json:"final_path"`
 			ChunkSize   int    `json:"chunk_size"`
 			TotalChunks int    `json:"total_chunks"`
+			ServiceID   string `json:"serviceID"`
 		}
 		// decoding the body
 		err := json.NewDecoder(r.Body).Decode(&reqBody)
@@ -189,6 +187,7 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.Up
 		// TODO need to add some safety measures
 		safemap.Add(reqBody.UploadID, &p_upload_request.UploadRequest{
 			UploadID:    reqBody.UploadID,
+			ServiceID:   reqBody.ServiceID,
 			FileName:    reqBody.Filename,
 			ParentPath:  reqBody.FinalPath,
 			TotalChunks: reqBody.TotalChunks,

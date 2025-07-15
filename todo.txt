@@ -27,4 +27,12 @@ in the service package, possibility of making memory usage more efficient by usi
 todo 5
 in the service package, when new Service is being created, make sure everything (scheme, host, port, callbackurl) follows the appropriate pattern
 
+todo 6
+in the main package, when im creating the service map, make sure you create a seperate monitoring go-routine to handle requests that have been sitting in memory for too long
+
+todo 7
+implement rate limiting in version 2, right now limiting is not implemented, any body can flood my server and then good luck 
+
+
+
 important todo: read about file descriptors understand what they are 

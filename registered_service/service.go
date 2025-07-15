@@ -58,7 +58,12 @@ func (s *Service) GetServiceCallBackUrl() string {
 
 }
 
-func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
+// public function to start the service session
+func (s *Service) Start(ctx context.Context) {
+	go s.start_service_status_channel_monitor(ctx)
+}
+
+func (s *Service) start_service_status_channel_monitor(ctx context.Context) {
 	for {
 
 		select {
