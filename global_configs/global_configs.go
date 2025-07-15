@@ -26,6 +26,9 @@ const SERVICESTATUSNOTIFICATIONCHANNELBUFFER = 5
 var cHUNKUPLOADROOTFOLDER string = "chunk_uploads"
 var uPLOADROOT string = "upload_root"
 
+const SCHEME_HTTP = "http"
+const SCHEME_HTTPS = "https"
+
 //var CHUNKUPLOADROOTFOLDERPATH string = filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
 func CHUNKUPLOADROOTFOLDERPATH() string {
 	return filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
