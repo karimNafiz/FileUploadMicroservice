@@ -24,5 +24,7 @@ in the service package, handle proper clean up when the context is Done
 todo 4
 in the service package, possibility of making memory usage more efficient by using points instead of copy of string to string maps
 
+todo 5
+in the service package, when new Service is being created, make sure everything (scheme, host, port, callbackurl) follows the appropriate pattern
 
 important todo: read about file descriptors understand what they are 

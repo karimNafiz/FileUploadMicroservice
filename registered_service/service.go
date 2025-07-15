@@ -27,20 +27,34 @@ type Service struct {
 	// when an upload session is complete
 	// we need to notify the main service that the job that they requested is complete, failed and stuff
 	UploadStatusCallEndPoint         string
-	ServiceStatusNotificationChannel chan map[string]string // im making this into not a ptr, so that not so much pressure is put into heap
+	ServiceStatusNotificationChannel chan map[string]map[string]string // im making this into not a ptr, so that not so much pressure is put into heap
 }
 
 func NewService(id string, host string, scheme string, port string, upload_status_callback_endpoint string) *Service {
+	// TODO: make sure in later versions I had if everything (host, scheme, port, upload_status...endpoint) all follow the appropriate format
+
+	if upload_status_callback_endpoint[0] != '/' {
+		upload_status_callback_endpoint = "/" + upload_status_callback_endpoint
+	}
+
 	return &Service{
 		ServiceID:                        id,
 		Host:                             host,
 		Port:                             port,
 		UploadStatusCallEndPoint:         upload_status_callback_endpoint,
-		ServiceStatusNotificationChannel: make(chan map[string]string, p_global_configs.SERVICESTATUSNOTIFICATIONCHANNELBUFFER),
+		ServiceStatusNotificationChannel: make(chan map[string]map[string]string, p_global_configs.SERVICESTATUSNOTIFICATIONCHANNELBUFFER),
 	}
 }
 
 func (s *Service) GetServiceCallBackUrl() string {
+	portSegment := ""
+	if s.Port != "" {
+		portSegment += ":"
+	}
+	portSegment += s.Port
+
+	return fmt.Sprintf("%s://%s:%s%s", s.Scheme, s.Host, s.Port, s.UploadStatusCallEndPoint)
+	// example https://localhost:8000
 
 }
 
@@ -52,14 +66,14 @@ func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
 			// TODO
 			// using the callbackURL need to notifiy the foreign service that the file upload service is closed
 			return
-		case request <- s.ServiceStatusNotificationChannel:
+		case req := <-s.ServiceStatusNotificationChannel:
 			// need to make a request using the call back url
 			// encode the message and then using the callback url we need to send the encoded message to the foreign service
 			switch s.Scheme {
 			case p_global_configs.SCHEME_HTTP, p_global_configs.SCHEME_HTTPS:
 				// I'm sending the parent go-routines context.
 				// If the context is cancelled then it will cascade down into the child go-routine
-				go sendHTTP(context.Background(), request["headers"], request["message"], fmt.Sprintf())
+				go sendHTTP(context.Background(), req["headers"], req["message"], s.GetServiceCallBackUrl())
 
 			}
 
@@ -76,7 +90,7 @@ func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
 
 // / right now the function lacks any kind of error checking
 // / need to implement rettries based on the type of the error
-func sendHTTP(ctx context.Context, headers map[string]string, message map[string]string, url string) error {
+func sendHTTP(ctx context.Context, headers map[string]string, message map[string]string, url string) {
 	// first i need to create a context from the parent context
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second) // im setting it to 20
 	defer cancel()
@@ -85,11 +99,16 @@ func sendHTTP(ctx context.Context, headers map[string]string, message map[string
 	payload, err := json.Marshal(message)
 	if err != nil {
 		fmt.Println("func: sendHTTP, package: service, error marshalling json")
-		return err
+		return
 	}
 	// then using that context create create a request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload)) // we have to pass a bytes.Buffer because the function expects a io.Reader
 
+	if err != nil {
+		// TODO make sure to check if the error is context related or smth else
+		// based on the error try retry strategy
+		return
+	}
 	// add the headers
 	for k, v := range headers {
 		req.Header.Set(k, v)
@@ -109,12 +128,11 @@ func sendHTTP(ctx context.Context, headers map[string]string, message map[string
 	if err != nil {
 		// need to do a switch case based on the error type
 		fmt.Println(err.Error())
-		return err
+		return
 
 	}
 	defer resp.Body.Close()
 	// we can handle the resp.Boyd.Status code and shit
-	return nil
 
 	// then we do our request
 }
