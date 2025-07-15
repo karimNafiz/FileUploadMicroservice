@@ -40,6 +40,10 @@ func NewService(id string, host string, scheme string, port string, upload_statu
 	}
 }
 
+func (s *Service) GetServiceCallBackUrl() string {
+
+}
+
 func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
 	for {
 
@@ -48,11 +52,14 @@ func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
 			// TODO
 			// using the callbackURL need to notifiy the foreign service that the file upload service is closed
 			return
-		case message <- s.ServiceStatusNotificationChannel:
+		case request <- s.ServiceStatusNotificationChannel:
 			// need to make a request using the call back url
 			// encode the message and then using the callback url we need to send the encoded message to the foreign service
 			switch s.Scheme {
 			case p_global_configs.SCHEME_HTTP, p_global_configs.SCHEME_HTTPS:
+				// I'm sending the parent go-routines context.
+				// If the context is cancelled then it will cascade down into the child go-routine
+				go sendHTTP(context.Background(), request["headers"], request["message"], fmt.Sprintf())
 
 			}
 
@@ -61,62 +68,17 @@ func (s *Service) StartServiceStatusChannelMonitor(ctx context.Context) {
 
 }
 
-// func sendHTTP(headers map[string]string, message map[string]string) error {
-//     // 1) Create a context with a timeout
-//     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-//     defer cancel()
-
-//     // (Assuming you have a URL and have marshaled your message:)
-//     payload, err := json.Marshal(message)
-//     if err != nil {
-//         return err
-//     }
-//     url := "https://your-callback-url/path"
-
-//     // 2) Create a request with that context
-//     req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
-//     if err != nil {
-//         return err
-//     }
-//     // set headers
-//     for k, v := range headers {
-//         req.Header.Set(k, v)
-//     }
-
-//     // 3) Create a custom http.Transport
-//     transport := &http.Transport{
-//         // e.g.:
-//         TLSHandshakeTimeout: 5 * time.Second,
-//         MaxIdleConns:        100,
-//         IdleConnTimeout:     90 * time.Second,
-//     }
-
-//     // 4) Create an http.Client using that transport
-//     client := &http.Client{
-//         Transport: transport,
-//     }
-
-//     // 5) Perform the request
-//     resp, err := client.Do(req)
-//     if err != nil {
-//         return err
-//     }
-//     defer resp.Body.Close()
-
-//     // handle resp.StatusCode / resp.Body as needed
-//     return nil
-// }
-
-// need to be serious about contexts and timeouts
-
 // / <summary>
 // / this function will send a http request back to the foreign service, that has registered itself with the file upload service
 // / this function assumes proper headers to be passed.
 // / moreover, this function assumes messages to be properly tagged with json tags
 // / </summary>
-func sendHTTP(headers map[string]string, message map[string]string, url string) error {
-	// first i need to create a context with background timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // im setting it to 20
+
+// / right now the function lacks any kind of error checking
+// / need to implement rettries based on the type of the error
+func sendHTTP(ctx context.Context, headers map[string]string, message map[string]string, url string) error {
+	// first i need to create a context from the parent context
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second) // im setting it to 20
 	defer cancel()
 
 	// need to create the payload

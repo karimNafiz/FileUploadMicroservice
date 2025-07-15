@@ -20,3 +20,9 @@ upload session service status consider the benefits of having a struct represent
 
 todo 3
 in the service package, handle proper clean up when the context is Done
+
+todo 4
+in the service package, possibility of making memory usage more efficient by using points instead of copy of string to string maps
+
+
+important todo: read about file descriptors understand what they are 
