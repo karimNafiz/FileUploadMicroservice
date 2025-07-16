@@ -1,8 +1,12 @@
 package upload_request
 
+import (
+	p_registered_service "github.com/file_upload_microservice/registered_service"
+)
+
 type UploadRequest struct {
 	UploadID    string
-	ServiceID   string
+	Service     *p_registered_service.Service
 	ChunkSize   int
 	TotalChunks int
 	FileName    string

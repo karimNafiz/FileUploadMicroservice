@@ -93,7 +93,7 @@ func main() {
 
 func setUpRouter(parent_ctx context.Context, safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
 	router := mux.NewRouter()
-	router.Handle("/upload/init", getInitUploadSessionHandler(safemap)).Methods("POST")
+	router.Handle("/upload/init", getInitUploadSessionHandler(safemap, service_map)).Methods("POST")
 	router.Handle("/register", GetRegisterToFileUploadService(parent_ctx, service_map))
 	return router
 }
@@ -157,7 +157,7 @@ func start_service_id(start_index int) func() string {
 	}
 }
 
-func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest]) http.Handler {
+func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// need to make sure the connection is closed
@@ -181,13 +181,22 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.Up
 			return
 		}
 
+		// according to the serviceID get the ptr to the service
+		service_ptr, ok := service_map.Get(reqBody.ServiceID)
+		if !ok {
+			// if the service is not found
+			// that means the service hasn't registered to the file upload service
+			// need to send the service appropriate message
+			return
+		}
+
 		// if there are not errors in the request body need to create a NewUploadSession struct
 		// I am manually adding the UploadSession
 		// create a NewUploadSession
 		// TODO need to add some safety measures
 		safemap.Add(reqBody.UploadID, &p_upload_request.UploadRequest{
 			UploadID:    reqBody.UploadID,
-			ServiceID:   reqBody.ServiceID,
+			Service:     service_ptr,
 			FileName:    reqBody.Filename,
 			ParentPath:  reqBody.FinalPath,
 			TotalChunks: reqBody.TotalChunks,

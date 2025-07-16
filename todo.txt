@@ -33,6 +33,22 @@ in the main package, when im creating the service map, make sure you create a se
 todo 7
 implement rate limiting in version 2, right now limiting is not implemented, any body can flood my server and then good luck 
 
+todo : package -> uplaod_session  {
+    for acks and errors, right now I am not handling the error when acks or errors are not getting properly written back to the clients
+    implemnet retry policies 
+    
+    for acks implement buffering so that we don't incur too many syscalls
+
+    for errors its important we send them back as soon as possible 
+
+    need to implement major refactors regarding timeouts
+
+    right now I'm not handling error write backs to the main service if a upload session fails
+    ideas: have a close function for an upload session 
+    in the close function based on if the uplaod session was complete or not
+    send a message back 
+}
+
 
 
 important todo: read about file descriptors understand what they are 

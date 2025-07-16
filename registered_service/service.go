@@ -60,6 +60,7 @@ func (s *Service) GetServiceCallBackUrl() string {
 
 // public function to start the service session
 func (s *Service) Start(ctx context.Context) {
+	fmt.Println("Service Monitoring starting for service " + s.ServiceID)
 	go s.start_service_status_channel_monitor(ctx)
 }
 

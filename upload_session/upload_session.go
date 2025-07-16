@@ -10,8 +10,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
@@ -63,11 +65,6 @@ type UploadSession struct {
 	Acks    chan *p_chunk_job.ChunkJobAck
 	Context context.Context
 	Done    chan struct{}
-
-	// important stuff to keep in mind make sure we push a "message" to this channel
-	// after all the essential task of the upload session is complete
-	// TODO consider if sending a pointer or a direct copy would be better
-	ServiceStatusChannel chan<- *map[string]string
 }
 
 func (u *UploadSession) Close() {
@@ -142,28 +139,25 @@ func (upload_session *UploadSession) handle_upload_session_channels(ctx context.
 			//fmt.Println("added chunk job from upload_session.In into the chunk job ")
 			//fmt.Println(" chunk job: " + chunk_job.String())
 			p_chunk_job.AddChunkJob(chunk_job)
-		// maybe instead of hard coding this error I need to find a better solution
-		// maybe have encode functions for those structs?
+
 		case chunk_job_error := <-upload_session.Err:
 			bytes, err := chunk_job_error.MarshalJSON()
 			if err != nil {
-				// don't really what to do in this case
+				// need to retry
 			}
 			upload_session.Writer.Write(bytes)
-			// write back to the connection
+
 		case chunk_job_ack := <-upload_session.Acks:
-			// when there is an ack
-			// i need to notify the upload session
-			// add a buffering
+			// TODO: add buffering
+			// Such that after a fixed number of acks,
+			// we send them back to the client
 			bytes, err := chunk_job_ack.MarshalJSON()
 			if err != nil {
-				// don't know what to really do
+				// try retry policies
 			}
 			// do no simply write every chunk at once maybe
 			upload_session.Writer.Write(bytes)
-			// important note im putting this function after writing to the network
 			fmt.Println(chunk_job_ack.String())
-			// im getting some misalignement between the server and client
 			upload_session.update_session()
 		case <-upload_session.Done:
 			fmt.Println("stdout from upload_session.Done channel ")
@@ -180,9 +174,6 @@ func (upload_session *UploadSession) handle_upload_session_channels(ctx context.
 
 }
 
-// need to added context
-// to stop the entire shit
-// if the main service falls
 func (u *UploadSession) read_frm_conn(ctx context.Context) {
 
 	var header_body struct {
@@ -192,13 +183,13 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 		ChunkSize     int    `json:"chunk_size"`
 	}
 	for {
-		// I need to handle the situation where no data is sent
-		// ill do this later after I'm done cleaning up
+		// TODO: implement timeouts, major refactor
 
 		select {
 		case <-ctx.Done():
 			fmt.Println("context cancelled in read_frm_conn:", ctx.Err())
-			// need to return a error back to the client
+			// if context is canelled that means main service has stopped
+			// need to write back to the client
 			return
 		default:
 			header_buffer, err := read_header(u.Reader, global_configs.HEADERlENGTH)
@@ -218,24 +209,17 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 			switch header_body.OperationCode {
 
 			case global_configs.UPLOADCHUNKOPCODE:
-				// read the chunk
 				chunk_buffer, err := read_chunk(u.Reader, header_body.ChunkSize)
-				// if there is an error
-				// send it to the error channel
 				if err != nil {
-					// issues with reading chunks
-					// need to send the sender a message
 					log.Println("error reading chunk:", err)
 					u.Err <- &p_chunk_job.ChunkJobError{UploadID: header_body.UploadID, ChunkNo: uint(header_body.ChunkNo), Error: err}
 					continue
 				}
-				// create a chunk job
 				chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), u.UploadRequest.ParentPath, chunk_buffer, u.Acks, u.Err)
-				// add it to the upload_session's in channel
 				u.In <- chunk_job
 			case global_configs.UPLOADFINISHOPCODE:
 				// after the client has recieved acks for all the chunks
-				// its going to want to finish upload
+				// it will send a message with an upload finish code
 				if !u.IsComplete {
 					// not all chunks confirmed yet: ask client to wait or retry missing
 					// this is temporary
@@ -246,31 +230,10 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 					u.Writer.Write(b)
 					continue
 				}
-				// if the upload_session is also complete
-				// this sneaking line of code is causing deadlocks
-				// u.Done <- struct{}{}
-				// send final complete notice
-				// maybe send status codes
-				// TOOD get appropriate status code
-
-				// before sending in complete
-				// TODO make seperate packages for merging and cleaning up
-				// TODO imp note make seperate package for merging and cleaning up
-				// err := merge_all_chunks()
-				// if err != nil {
-				// 	// edit the message
-				// 	// based on the error do re-try policies
-				// }
-				// err := clean_up_chunks()
-
-				// do all of the merging
-
-				// confirm_all_chunks()
-				// merge_all_chunks()
-				// clean_all_chunks()
 				err := mergeChunks(global_configs.CHUNKUPLOADROOTFOLDERPATH(), u.UploadRequest)
 				if err != nil {
-					// TODO thing about ways to resolve this issue
+					// implement retry policies
+					// maybe use a for loop
 				}
 
 				complete := map[string]string{
@@ -279,20 +242,21 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 				}
 				b, _ := json.Marshal(complete)
 				u.Writer.Write(b)
-
-				// very important need to close the connection
-				// u.Writer.Close()
 				u.Close()
 				cleanupChunks(global_configs.CHUNKUPLOADROOTFOLDERPATH(), u.UploadRequest)
 
-				// after all of the uplaoding is complete
-				message := &map[string]string{
-					"Status":   "200",
-					"UploadID": u.UploadRequest.UploadID,
-					"Message":  "upload successful",
-					"Error":    "",
+				msg := map[string]map[string]string{
+					"headers": {
+						"Content-Type":        "application/json",
+						"X-Upload-Service-Id": u.UploadRequest.Service.ServiceID,
+					},
+					"body": {
+						"statusCode": strconv.Itoa(http.StatusOK), // "200"
+						"status":     "success",
+						"uploadId":   u.UploadRequest.UploadID,
+					},
 				}
-				u.ServiceStatusChannel <- message
+				u.UploadRequest.Service.ServiceStatusNotificationChannel <- msg
 
 				// need to cancel the context to signal other go-routines to also stop
 				// cancel the context
