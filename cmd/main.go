@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"path/filepath"
 
 	"crypto/tls"
 
@@ -98,6 +99,29 @@ func main() {
 		handlers.AllowedHeaders([]string{"Content-Type", "X-Chunk-Index"}),
 		handlers.AllowCredentials(),
 	)
+
+	// need to listen to the port tls port
+	// need to spawn one more go-routine
+	tls_cert, err := load_tls_cert_and_key(filepath.Join(p_global_configs.TLSCERTDST, p_global_configs.TLSCERTNAME), filepath.Join(p_global_configs.TLSCERTDST, p_global_configs.TLSKEYNAME))
+	if err != nil {
+		cancel()
+		fmt.Println("could not load the tls configs ")
+		return
+	}
+	tls_config := &tls.Config{
+		Certificates: []tls.Certificate{tls_cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	go func() {
+		tls_srv := &http.Server{
+			Addr:      ":8443",
+			Handler:   GetRegisterToFileUploadService(ctx, service_map),
+			TLSConfig: tls_config,
+		}
+		log.Fatal(tls_srv.ListenAndServeTLS("", ""))
+
+	}()
 
 	log.Println(" Main Server running on :8000 ")
 	http.ListenAndServe(":8000", cors(router))

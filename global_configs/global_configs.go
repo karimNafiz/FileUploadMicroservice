@@ -23,6 +23,10 @@ const CHUNKJOBCHANNELBUFFERSIZE = 10
 // consider increasing it after testing the file upload service with the main file upload service
 const SERVICESTATUSNOTIFICATIONCHANNELBUFFER = 5
 
+const TLSCERTDST = "tls"
+const TLSCERTNAME = "server.crt"
+const TLSKEYNAME = "server.key"
+
 var cHUNKUPLOADROOTFOLDER string = "chunk_uploads"
 var uPLOADROOT string = "upload_root"
 
