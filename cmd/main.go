@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"crypto/tls"
+
 	"net/http"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
@@ -23,6 +25,17 @@ import (
 
 // TODO: refactor the package.
 // Currently, this package has functions that do not belong here
+
+// / <summary>
+// / function used to load tls certificate and key
+// / </summary>
+func load_tls_cert_and_key(cert_dst string, key_dst string) (tls.Certificate, error) {
+	cert, err := tls.LoadX509KeyPair(cert_dst, key_dst)
+	if err != nil {
+		log.Fatalf("could not load key pair: %v", err)
+	}
+	return cert, err
+}
 
 func main() {
 
@@ -94,7 +107,8 @@ func main() {
 func setUpRouter(parent_ctx context.Context, safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
 	router := mux.NewRouter()
 	router.Handle("/upload/init", getInitUploadSessionHandler(safemap, service_map)).Methods("POST")
-	router.Handle("/register", GetRegisterToFileUploadService(parent_ctx, service_map))
+	// this route will be secured by tls to ensure the registration process in encrypted
+	//router.Handle("/register", GetRegisterToFileUploadService(parent_ctx, service_map))
 	return router
 }
 

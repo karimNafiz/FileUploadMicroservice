@@ -256,6 +256,10 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 						"uploadId":   u.UploadRequest.UploadID,
 					},
 				}
+
+				/// CAUTION THIS LINE OF CODE IS BLOCKING
+				/// IF THE SERVICESTATUSNOTIFICATIONCHANNEL IS FULL THEN THE CODE WILL BLOCK
+				/// RE-CONSIDER CODE DESIGN IN THE FUTURE
 				u.UploadRequest.Service.ServiceStatusNotificationChannel <- msg
 
 				// need to cancel the context to signal other go-routines to also stop
