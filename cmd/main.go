@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/file_upload_microservice/utility"
+
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	"github.com/file_upload_microservice/global_configs"
 	p_global_configs "github.com/file_upload_microservice/global_configs"
@@ -100,7 +102,7 @@ func main() {
 
 	// need to listen to the port tls port
 	// need to spawn one more go-routine
-	tls_cert, err := load_tls_cert_and_key(filepath.Join(p_global_configs.TLSCERTDST, p_global_configs.TLSCERTNAME), filepath.Join(p_global_configs.TLSCERTDST, p_global_configs.TLSKEYNAME))
+	tls_cert, err := utility.LoadTLSCertKey(filepath.Join(p_global_configs.TLSCERTDST, p_global_configs.TLSCERTNAME), filepath.Join(p_global_configs.TLSCERTDST, p_global_configs.TLSKEYNAME))
 	if err != nil {
 		cancel()
 		fmt.Println("could not load the tls configs ")
@@ -136,7 +138,7 @@ func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], se
 
 // take in the safemap
 func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
-	get_service_id := start_service_id(-1)
+	// get_service_id := utility.NewUploadID()
 	// need a handler for main services to register to the file-upload service
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// very important to avoid memory leaks
@@ -160,7 +162,7 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 		}
 		// if not error decoding the body
 		// we need to create a new service
-		service_id := get_service_id()
+		service_id := utility.NewUploadID()
 		service := p_registered_service.NewService(service_id, reqBody.Host, reqBody.Scheme, reqBody.Port, reqBody.UploadStatusCallBackURL)
 		// after creating the service add it to the safemap
 		// TODO implement the ID check if the id already exists
@@ -184,13 +186,6 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 		})
 
 	})
-}
-
-func start_service_id(start_index int) func() string {
-	return func() string {
-		start_index++
-		return fmt.Sprintf("service:%d", start_index)
-	}
 }
 
 func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
