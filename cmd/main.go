@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
-	"path/filepath"
-
-	"crypto/tls"
-
 	"net/http"
+	"path/filepath"
 
 	p_chunk_job "github.com/file_upload_microservice/chunk_job"
 	"github.com/file_upload_microservice/global_configs"
@@ -77,7 +75,7 @@ func main() {
 	service_map := p_safemap.NewSafeMap[*p_registered_service.Service]()
 
 	// set up router  to different handlers
-	router := setUpRouter(ctx, safemap, service_map)
+	router := setUpRouter(safemap, service_map)
 
 	// need to launch this service in a different go-routine or else
 	// no code will run below this code
@@ -128,7 +126,7 @@ func main() {
 
 }
 
-func setUpRouter(parent_ctx context.Context, safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
+func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], service_map *p_safemap.SafeMap[*p_registered_service.Service]) *mux.Router {
 	router := mux.NewRouter()
 	router.Handle("/upload/init", getInitUploadSessionHandler(safemap, service_map)).Methods("POST")
 	// this route will be secured by tls to ensure the registration process in encrypted
