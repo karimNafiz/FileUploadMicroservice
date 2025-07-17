@@ -24,13 +24,14 @@ type Service struct {
 	Host      string
 	Scheme    string
 	Port      string
+	SecretKey string
 	// when an upload session is complete
 	// we need to notify the main service that the job that they requested is complete, failed and stuff
 	UploadStatusCallEndPoint         string
 	ServiceStatusNotificationChannel chan map[string]map[string]string // im making this into not a ptr, so that not so much pressure is put into heap
 }
 
-func NewService(id string, host string, scheme string, port string, upload_status_callback_endpoint string) *Service {
+func NewService(id string, secret_key string, host string, scheme string, port string, upload_status_callback_endpoint string) *Service {
 	// TODO: make sure in later versions I had if everything (host, scheme, port, upload_status...endpoint) all follow the appropriate format
 
 	if upload_status_callback_endpoint[0] != '/' {
@@ -39,6 +40,7 @@ func NewService(id string, host string, scheme string, port string, upload_statu
 
 	return &Service{
 		ServiceID:                        id,
+		SecretKey:                        secret_key,
 		Host:                             host,
 		Port:                             port,
 		UploadStatusCallEndPoint:         upload_status_callback_endpoint,

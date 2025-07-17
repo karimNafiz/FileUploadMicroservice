@@ -163,7 +163,12 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 		// if not error decoding the body
 		// we need to create a new service
 		service_id := utility.NewUploadID()
-		service := p_registered_service.NewService(service_id, reqBody.Host, reqBody.Scheme, reqBody.Port, reqBody.UploadStatusCallBackURL)
+		secret_key, err := utility.GenerateKey()
+		for err != nil {
+			fmt.Println("error generating a new key")
+			secret_key, err = utility.GenerateKey()
+		}
+		service := p_registered_service.NewService(service_id, utility.GetKeyString(secret_key), reqBody.Host, reqBody.Scheme, reqBody.Port, reqBody.UploadStatusCallBackURL)
 		// after creating the service add it to the safemap
 		// TODO implement the ID check if the id already exists
 		// for our simple case that won't be the issue

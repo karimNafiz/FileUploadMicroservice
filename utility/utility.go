@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -38,6 +39,9 @@ func GenerateKey() ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+func GetKeyString(key []byte) string {
+	return base64.RawURLEncoding.EncodeToString(key)
 }
 
 func ComputeHMAC(data, key []byte) string {
