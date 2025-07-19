@@ -49,3 +49,14 @@ func ComputeHMAC(data, key []byte) string {
 	mac.Write(data)
 	return hex.EncodeToString(mac.Sum(nil))
 }
+
+func ComputeHMACSignature(method, path, query, body, timestamp, secret string, comput_hmac_func func([]byte, []byte) string) (string, error) {
+	// first compute hash of body
+	bytes_secret := []byte(secret)
+	body_hash := comput_hmac_func([]byte(body), bytes_secret)
+
+	request_signature := []byte(fmt.Sprintf("%s\n%s\n%s\n%s\n%s", method, path, query, body_hash, timestamp))
+	hmac_signature := comput_hmac_func(request_signature, []byte(secret))
+	return hmac_signature, nil
+
+}

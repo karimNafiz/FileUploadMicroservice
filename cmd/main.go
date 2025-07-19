@@ -30,13 +30,13 @@ import (
 // / <summary>
 // / function used to load tls certificate and key
 // / </summary>
-func load_tls_cert_and_key(cert_dst string, key_dst string) (tls.Certificate, error) {
-	cert, err := tls.LoadX509KeyPair(cert_dst, key_dst)
-	if err != nil {
-		log.Fatalf("could not load key pair: %v", err)
-	}
-	return cert, err
-}
+// func load_tls_cert_and_key(cert_dst string, key_dst string) (tls.Certificate, error) {
+// 	cert, err := tls.LoadX509KeyPair(cert_dst, key_dst)
+// 	if err != nil {
+// 		log.Fatalf("could not load key pair: %v", err)
+// 	}
+// 	return cert, err
+// }
 
 func main() {
 
@@ -136,6 +136,7 @@ func setUpRouter(safemap *p_safemap.SafeMap[*p_upload_request.UploadRequest], se
 	return router
 }
 
+// TODO implement hmac generation and method signature functions for sensitive http endpoints
 // take in the safemap
 func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_safemap.SafeMap[*p_registered_service.Service]) http.Handler {
 	// get_service_id := utility.NewUploadID()
@@ -162,6 +163,7 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 		}
 		// if not error decoding the body
 		// we need to create a new service
+		// there is a very little chance that the upload id created will be equal
 		service_id := utility.NewUploadID()
 		secret_key, err := utility.GenerateKey()
 		for err != nil {
@@ -187,6 +189,7 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 		w.WriteHeader(http.StatusAccepted)
 		json.NewEncoder(w).Encode(map[string]string{
 			"service_id": service_id,
+			"secret_key": service.SecretKey, // now i can send the secret key as raw text because im using tls for the communication
 			"message":    "service registered",
 		})
 
