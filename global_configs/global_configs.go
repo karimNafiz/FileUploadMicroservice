@@ -1,6 +1,8 @@
 package global_configs
 
-import "path/filepath"
+import (
+	"path/filepath"
+)
 
 const HEADERlENGTH = 4
 
@@ -30,10 +32,15 @@ const TLSKEYNAME = "server.key"
 var cHUNKUPLOADROOTFOLDER string = "chunk_uploads"
 var uPLOADROOT string = "upload_root"
 
+const FILEUPLOADDOMAIN = "localhost"
+const FILEUPLOADPORT = "9000"
+
+//const FILEUPLOADURL = fmt.Sprintf("%s://%s:%s%s" , SCHEME_HTTP ,FILEUPLOADDOMAIN,FILEUPLOADPORT, )
+
 const SCHEME_HTTP = "http"
 const SCHEME_HTTPS = "https"
 
-//var CHUNKUPLOADROOTFOLDERPATH string = filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
+// var CHUNKUPLOADROOTFOLDERPATH string = filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
 func CHUNKUPLOADROOTFOLDERPATH() string {
 	return filepath.Join(uPLOADROOT, cHUNKUPLOADROOTFOLDER)
 }

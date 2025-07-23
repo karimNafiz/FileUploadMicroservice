@@ -33,7 +33,8 @@ type Service struct {
 
 func NewService(id string, secret_key string, host string, scheme string, port string, upload_status_callback_endpoint string) *Service {
 	// TODO: make sure in later versions I had if everything (host, scheme, port, upload_status...endpoint) all follow the appropriate format
-
+	// this threw me a panic, because the variable was null
+	// make sure I put in good error checking
 	if upload_status_callback_endpoint[0] != '/' {
 		upload_status_callback_endpoint = "/" + upload_status_callback_endpoint
 	}
@@ -125,12 +126,12 @@ func sendHTTP(ctx context.Context, headers map[string]string, message map[string
 	transport := &http.Transport{
 		// e.g.:
 		TLSHandshakeTimeout: 5 * time.Second,
-		MaxIdleConns:        1,
-		IdleConnTimeout:     20 * time.Second,
+		DisableKeepAlives:   true,
 	}
 	// using that we create a http.Client
 	client := http.Client{
 		Transport: transport,
+		Timeout:   10 * time.Second,
 	}
 	resp, err := client.Do(req)
 	if err != nil {

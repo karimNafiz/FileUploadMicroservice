@@ -72,7 +72,7 @@ func StartTCPListener(ctx context.Context, port string, safemap *safemap.SafeMap
 func handle_connection_new(ctx context.Context, conn net.Conn, safemap *safemap.SafeMap[*p_upload_request.UploadRequest]) {
 	// prepare our JSON envelope
 	response := struct {
-		Status  int    `json:"status"`
+		Status  string `json:"status"`
 		Message string `json:"message"`
 	}{}
 
@@ -89,7 +89,7 @@ func handle_connection_new(ctx context.Context, conn net.Conn, safemap *safemap.
 	bReader := bufio.NewReader(conn)
 	headerBuf, err := read_header(bReader, global_configs.HEADERlENGTH)
 	if err != nil {
-		response.Status = 500
+		response.Status = "error"
 		response.Message = "error reading header of the new upload session"
 		sendResponse()
 		return
@@ -102,15 +102,22 @@ func handle_connection_new(ctx context.Context, conn net.Conn, safemap *safemap.
 		ChunkSize     int    `json:"chunk_size"`
 	}
 	if err := json.Unmarshal(headerBuf, &headerBody); err != nil {
-		response.Status = 400
+		response.Status = "error"
 		response.Message = "invalid header JSON payload"
+		sendResponse()
+		return
+	}
+	// TODO: do more checks like check the chunk size and chunk no
+	if headerBody.OperationCode != global_configs.UPLOADINITOPCODE {
+		response.Status = "error"
+		response.Message = "invalid operation code"
 		sendResponse()
 		return
 	}
 
 	uploadReq, ok := safemap.Get(headerBody.UploadID)
 	if !ok {
-		response.Status = 404
+		response.Status = "error"
 		response.Message = "upload session not registered"
 		sendResponse()
 		return
@@ -118,6 +125,18 @@ func handle_connection_new(ctx context.Context, conn net.Conn, safemap *safemap.
 
 	// everything’s good — send an “OK” and proceed
 	// if everything is found
+	err = json.NewEncoder(conn).Encode(map[string]string{
+		"status": "ok",
+	})
+	if err != nil {
+		// TODO: look up a better status code
+		response.Status = "error"
+		response.Message = "could not ack the client after upload init opcode"
+		sendResponse()
+		return
+	}
+	response.Status = "ok"
+	response.Message = "upload session initialized and read to receive chunks"
 
 	// create the UploadSession
 	// right now I'm hard coding the 16, but create a const in the global_configs

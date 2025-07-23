@@ -93,11 +93,14 @@ func (c *ChunkJobError) MarshalJSON() ([]byte, error) {
 	body := struct {
 		UploadID string `json:"uploadID"`
 		ChunkNo  uint   `json:"chunk_no"`
+		Status   string `json:"status"`
 		Error    string `json:"error"`
 	}{
 		UploadID: c.UploadID,
 		ChunkNo:  c.ChunkNo,
-		Error:    c.Error.Error(),
+		// TODO: re-consider this implementation
+		Status: "error", // hard coding this here
+		Error:  c.Error.Error(),
 	}
 	return json.Marshal(body)
 

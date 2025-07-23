@@ -205,7 +205,7 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 				fmt.Println("error unmarshalling the header ")
 				fmt.Println(err.Error())
 			}
-
+			log.Println("read header sent from client ", header_body)
 			switch header_body.OperationCode {
 
 			case global_configs.UPLOADCHUNKOPCODE:
@@ -216,6 +216,7 @@ func (u *UploadSession) read_frm_conn(ctx context.Context) {
 					continue
 				}
 				chunk_job := p_chunk_job.CreateChunkJob(header_body.UploadID, uint(header_body.ChunkNo), u.UploadRequest.ParentPath, chunk_buffer, u.Acks, u.Err)
+				log.Println("chunk job created chunkjob ->", chunk_job)
 				u.In <- chunk_job
 			case global_configs.UPLOADFINISHOPCODE:
 				// after the client has recieved acks for all the chunks
@@ -324,14 +325,20 @@ func read_header(bReader *bufio.Reader, header_len int) ([]byte, error) {
 
 func read_chunk(bReader *bufio.Reader, chunk_size int) ([]byte, error) {
 	chunk_buffer := make([]byte, chunk_size)
-	n, err := io.ReadFull(bReader, chunk_buffer[:])
-
-	if n < chunk_size {
-		return nil, errors.New(" not all of the chunk is sent ")
-	}
+	// TODO: i removed the size checking for a reason
+	// TODO: bring back the size checking
+	fmt.Println("reading raw chunk")
+	_, err := io.ReadFull(bReader, chunk_buffer[:])
+	fmt.Println("raw chunk reading finished")
+	//if n < chunk_size {
+	//	return nil, errors.New(" not all of the chunk is sent ")
+	//}
+	//if err != nil {
+	//
+	//	return nil, errors.New("reading chunk error")
+	//}
 	if err != nil {
-
-		return nil, errors.New("reading chunk error")
+		fmt.Println("error reading chunk:", err)
 	}
 
 	return chunk_buffer, nil

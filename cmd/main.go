@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -50,18 +51,21 @@ func main() {
 	// if there are errors with starting the worker pool
 	// we return and cancel the context
 	if err != nil {
+		fmt.Println("Error starting worker pool: ", err)
 		cancel()
 		return
 	}
 
 	err = p_chunk_job.StartErrorHandlerPool(ctx, global_configs.CHUNKJOBERRPOOL)
 	if err != nil {
+		fmt.Println("Error starting error handler pool: ", err)
 		cancel()
 		return
 	}
 
 	err = p_chunk_job.StartJobConfirmationHandlerPool(ctx, global_configs.CHUNKJOBCONFIRMATIONWORKERPOOL)
 	if err != nil {
+		fmt.Println("Error starting job confirmation worker pool: ", err)
 		cancel()
 		return
 	}
@@ -86,6 +90,7 @@ func main() {
 		// currently start the tcp listener on port 9000
 		// currently hard coding it, need to change it later
 		// passing the safe map created
+		fmt.Println("starting a server on port 9000 for chunked upload")
 		p_tcp_core.StartTCPListener(ctx, ":9000", safemap)
 
 	}()
@@ -108,17 +113,19 @@ func main() {
 		fmt.Println("could not load the tls configs ")
 		return
 	}
+	fmt.Println("got the tls certificate ")
 	tls_config := &tls.Config{
 		Certificates: []tls.Certificate{tls_cert},
 		MinVersion:   tls.VersionTLS12,
 	}
-
+	fmt.Println("created the tls_config from the tls certificate ")
 	go func() {
 		tls_srv := &http.Server{
 			Addr:      ":8443",
 			Handler:   GetRegisterToFileUploadService(ctx, service_map),
 			TLSConfig: tls_config,
 		}
+		fmt.Println("starting the http server on port 8443")
 		log.Fatal(tls_srv.ListenAndServeTLS("", ""))
 
 	}()
@@ -143,7 +150,13 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 	// need a handler for main services to register to the file-upload service
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// very important to avoid memory leaks
-		defer r.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+
+			}
+		}(r.Body)
+
 		w.Header().Set("Content-Type", "application/json")
 		var reqBody struct {
 			Host                    string `json:"host"`
@@ -161,6 +174,8 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 				"message": "bad request body",
 			})
 		}
+		log.Println("decoded the request body")
+		log.Println(reqBody)
 		// if not error decoding the body
 		// we need to create a new service
 		// there is a very little chance that the upload id created will be equal
@@ -171,6 +186,7 @@ func GetRegisterToFileUploadService(parent_ctx context.Context, service_map *p_s
 			secret_key, err = utility.GenerateKey()
 		}
 		service := p_registered_service.NewService(service_id, utility.GetKeyString(secret_key), reqBody.Host, reqBody.Scheme, reqBody.Port, reqBody.UploadStatusCallBackURL)
+		log.Println("registering service ", service.ServiceID)
 		// after creating the service add it to the safemap
 		// TODO implement the ID check if the id already exists
 		// for our simple case that won't be the issue
@@ -247,7 +263,10 @@ func getInitUploadSessionHandler(safemap *p_safemap.SafeMap[*p_upload_request.Up
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Upload Request Created",
+			"status": "ok",
+			// TODO: right now im hardcoding the url change this later on
+			"file_upload_domain": global_configs.FILEUPLOADDOMAIN,
+			"file_upload_port":   global_configs.FILEUPLOADPORT,
 		})
 
 	})
